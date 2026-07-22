@@ -74,7 +74,7 @@ export default function Dashboard() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="px-5 py-4 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-800">Recent Submissions</h3>
+            <h3 className="font-semibold text-gray-800">Recent Task Submissions</h3>
           </div>
           <div className="divide-y divide-gray-50">
             {submissions.map((sub, i) => (
