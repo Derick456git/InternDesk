@@ -1,56 +1,39 @@
-import { useState, useMemo } from 'react'
-
-const PASS_THRESHOLD = 60
-
-const mockResults = [
-  { name: 'Amal', tech: 'MERN Stack', test: 'MERN Stack Assessment 1', score: 28 },
-  { name: 'Sarah', tech: 'MERN Stack', test: 'MERN Stack Assessment 1', score: 31 },
-  { name: 'Esha', tech: 'MERN Stack', test: 'MERN Stack Assessment 1', score: 15 },
-  { name: 'Rahul Sharma', tech: 'MERN Stack', test: 'MERN Stack Assessment 1', score: 22 },
-  { name: 'Biju', tech: 'Python', test: 'Python Basics Test', score: 19 },
-  { name: 'Priya Patel', tech: 'Python', test: 'Python Basics Test', score: 33 },
-  { name: 'Neha Joshi', tech: 'Python', test: 'Python Basics Test', score: 24 },
-  { name: 'Celina', tech: 'Flutter', test: 'Flutter Quiz 1', score: 26 },
-  { name: 'Kavita Nair', tech: 'Flutter', test: 'Flutter Quiz 1', score: 14 },
-  { name: 'Amit Kumar', tech: 'Flutter', test: 'Flutter Quiz 1', score: 20 },
-  { name: 'Deepak', tech: 'Java', test: 'Java Core Test', score: 29 },
-  { name: 'Sneha Reddy', tech: 'Java', test: 'Java Core Test', score: 35 },
-  { name: 'Arun Verma', tech: 'Java', test: 'Java Core Test', score: 17 },
-  { name: 'Vikram Singh', tech: 'MERN Stack', test: 'MERN Stack Assessment 1', score: 11 },
-  { name: 'Amal', tech: 'MERN Stack', test: 'Advanced React Test', score: 24 },
-  { name: 'Sarah', tech: 'MERN Stack', test: 'Advanced React Test', score: 27 },
-  { name: 'Biju', tech: 'Python', test: 'Django Basics Test', score: 21 },
-  { name: 'Celina', tech: 'Flutter', test: 'Flutter Widgets Test', score: 18 },
-]
-
-const allTechs = [...new Set(mockResults.map((r) => r.tech))].sort()
-const allNames = [...new Set(mockResults.map((r) => r.name))].sort()
+import { useState, useEffect, useMemo } from 'react'
+import { api } from '../api'
 
 const ITEMS_PER_PAGE = 5
 
 export default function ViewProgress() {
+  const [results, setResults] = useState([])
+  const [technologies, setTechnologies] = useState([])
   const [internFilter, setInternFilter] = useState('')
   const [techFilter, setTechFilter] = useState('')
   const [resultFilter, setResultFilter] = useState('All')
   const [page, setPage] = useState(1)
 
-  const enriched = useMemo(
-    () =>
-      mockResults.map((r) => {
-        const pct = ((r.score / 35) * 100).toFixed(1)
-        const passed = r.score >= 21
-        return { ...r, percentage: pct, result: passed ? 'Passed' : 'Failed' }
-      }),
-    []
-  )
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const params = new URLSearchParams()
+        if (internFilter) params.append('internName', internFilter)
+        if (techFilter) params.append('technology', techFilter)
+        if (resultFilter !== 'All') params.append('result', resultFilter)
+        const res = await api.get(`/evaluations/progress?${params}`)
+        setResults(res.data || [])
 
-  const filtered = useMemo(() => {
-    let data = enriched
-    if (internFilter) data = data.filter((r) => r.name === internFilter)
-    if (techFilter) data = data.filter((r) => r.tech === techFilter)
-    if (resultFilter !== 'All') data = data.filter((r) => r.result === resultFilter)
-    return data
-  }, [enriched, internFilter, techFilter, resultFilter])
+        const techRes = await api.get('/technologies')
+        setTechnologies(techRes.data || [])
+      } catch (err) {
+        console.error('Fetch progress error:', err)
+      }
+    }
+    fetchData()
+  }, [internFilter, techFilter, resultFilter])
+
+  const allNames = useMemo(() => [...new Set(results.map((r) => r.internName))].sort(), [results])
+  const allTechs = technologies.map((t) => t.name)
+
+  const filtered = results
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
   const safePage = Math.min(page, totalPages)
@@ -147,10 +130,10 @@ export default function ViewProgress() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {paginated.map((row, i) => (
-                <tr key={i} className="hover:bg-orange-50 transition-colors">
-                  <td className="px-5 py-3 font-medium text-gray-800">{row.name}</td>
-                  <td className="px-5 py-3 text-gray-600">{row.tech}</td>
-                  <td className="px-5 py-3 text-gray-600">{row.test}</td>
+                <tr key={row._id || i} className="hover:bg-orange-50 transition-colors">
+                  <td className="px-5 py-3 font-medium text-gray-800">{row.internName}</td>
+                  <td className="px-5 py-3 text-gray-600">{row.technology}</td>
+                  <td className="px-5 py-3 text-gray-600">{row.testName}</td>
                   <td className="px-5 py-3 font-medium text-gray-800">{row.percentage}%</td>
                   <td className="px-5 py-3">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${

@@ -3,7 +3,11 @@ import { useState } from 'react'
 const menuItems = [
   { id: 'registrations', label: 'Manage Registration', disabled: false },
   { id: 'technology', label: 'Manage Technology', disabled: false },
-  { id: 'syllabus', label: 'Manage Syllabus', disabled: false },
+  { id: 'syllabus', label: 'Manage Syllabus', disabled: false, nested: true, subItems: [
+    { key: 'create', label: 'Create Syllabus' },
+    { key: 'view', label: 'View Syllabus' },
+    { key: 'assign', label: 'Assign Syllabus' },
+  ]},
   { id: 'daily-notes', label: 'List Daily Notes', disabled: false },
   { id: 'question-bank', label: 'Question Bank', disabled: false, nested: true, subItems: [
     { key: 'add-topics', label: 'Add Topics' },
@@ -21,6 +25,7 @@ const menuItems = [
     { key: 'view-submissions', label: 'View Submissions' },
   ]},
   { id: 'progress', label: 'View Progress', disabled: false },
+  { id: 'notifications', label: 'Notifications', disabled: false },
 ]
 
 export default function Sidebar({ activeTab, onTabChange, subTabs, onSubTabChange }) {
@@ -63,7 +68,7 @@ export default function Sidebar({ activeTab, onTabChange, subTabs, onSubTabChang
                   if (item.nested) {
                     toggleMenu(item.id)
                     onTabChange(item.id)
-                    if (item.subItems?.length) {
+                    if (item.subItems?.length && !subTabs[item.id]) {
                       onSubTabChange(item.id, item.subItems[0].key)
                     }
                   } else {
