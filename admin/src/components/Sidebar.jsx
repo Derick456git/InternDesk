@@ -22,6 +22,7 @@ const menuItems = [
   { id: 'evaluation', label: 'Evaluation & Result', disabled: false },
   { id: 'task-management', label: 'Task Management', disabled: false, nested: true, subItems: [
     { key: 'assign-task', label: 'Assign Task' },
+    { key: 'view-assigned-tasks', label: 'View Assigned Tasks' },
     { key: 'view-submissions', label: 'View Submissions' },
   ]},
   { id: 'progress', label: 'View Progress', disabled: false },

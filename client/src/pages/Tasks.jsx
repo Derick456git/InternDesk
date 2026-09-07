@@ -66,7 +66,7 @@ export default function Tasks({ user }) {
       formData.append('zipFile', file)
 
       const res = await api.upload(`/tasks/${taskId}/upload-zip`, formData)
-      setAlert({ type: 'success', message: res.message || 'Practical task .zip uploaded to Cloudinary successfully.' })
+      setAlert({ type: 'success', message: res.message || 'Practical task .zip uploaded successfully.' })
       setZipFiles((prev) => ({ ...prev, [taskId]: null }))
       fetchTasks()
     } catch (err) {
@@ -128,7 +128,7 @@ export default function Tasks({ user }) {
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                           isSubmitted ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                         }`}>
-                          {isSubmitted ? 'Submitted to Cloudinary' : 'Pending Submission'}
+                          {isSubmitted ? 'Submitted successfully!' : 'Pending Submission'}
                         </span>
                       </div>
 
