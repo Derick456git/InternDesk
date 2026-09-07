@@ -9,7 +9,8 @@ const transporter = nodemailer.createTransport({
 })
 
 const getInternLoginUrl = () => {
-  return process.env.CLIENT_URL || 'http://localhost:5173/login'
+  const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '')
+  return clientUrl.endsWith('/login') ? clientUrl : `${clientUrl}/login`
 }
 
 const renderInternLoginButtonHtml = (label = 'Login to Intern Portal →') => {

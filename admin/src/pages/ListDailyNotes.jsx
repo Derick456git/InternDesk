@@ -113,7 +113,8 @@ export default function ListDailyNotes() {
   const resolveFileUrl = (url) => {
     if (!url) return '#'
     if (url.startsWith('http://') || url.startsWith('https://')) return url
-    return `http://localhost:5000/${url.replace(/\\/g, '/')}`
+    const serverBase = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '')
+    return `${serverBase}/${url.replace(/\\/g, '/')}`
   }
 
   return (
