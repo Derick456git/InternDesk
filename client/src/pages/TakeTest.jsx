@@ -169,19 +169,19 @@ export default function TakeTest() {
   return (
     <div className="max-w-4xl mx-auto py-6 px-4 space-y-5">
       {/* Sticky Header with Timer */}
-      <div className="flex items-center justify-between bg-white p-5 rounded-2xl shadow-sm border border-gray-100 sticky top-4 z-40">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 sticky top-2 sm:top-4 z-40">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-orange-600 bg-orange-100 px-2.5 py-0.5 rounded-full inline-block mb-1">
             {test.technology} · Assessment {test.assessmentNumber}
           </span>
-          <h2 className="text-lg font-bold text-gray-900">{test.testName || test.name}</h2>
+          <h2 className="text-base sm:text-lg font-bold text-gray-900">{test.testName || test.name}</h2>
           <p className="text-xs text-gray-500 mt-0.5">
             Total 10 Questions (5 Objective + 5 Descriptive) · Max Score: 35 Marks
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
+        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+          <div className="text-left sm:text-right">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Time Remaining</span>
             <span className="text-xs text-gray-600 font-medium">25:00 Total</span>
           </div>

@@ -34,6 +34,7 @@ function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [subTabs, setSubTabs] = useState({
     syllabus: 'create',
     'question-bank': 'add-topics',
@@ -67,30 +68,39 @@ function App() {
     setSubTabs((prev) => ({ ...prev, [pageId]: subTab }))
   }
 
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId)
+    setSidebarOpen(false)
+  }
+
   return (
-    <div className="min-h-screen flex bg-gray-100">
+    <div className="min-h-screen flex bg-gray-100 relative overflow-x-hidden">
       <Sidebar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         subTabs={subTabs}
         onSubTabChange={handleSubTabChange}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
-      <div className="flex-1 flex flex-col ml-64">
+      <div className="flex-1 flex flex-col lg:ml-64 min-w-0 w-full">
         <Navbar
           user={user}
           onLogout={handleLogout}
+          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
           onNavigate={(tab, subTab) => {
             setActiveTab(tab)
             if (subTab) handleSubTabChange(tab, subTab)
+            setSidebarOpen(false)
           }}
         />
-        <main className="p-6">
+        <main className="p-3.5 sm:p-5 md:p-6 flex-1 min-w-0 max-w-full">
           {activeTab === 'syllabus' && (
             subTabs.syllabus === 'create'
-              ? <CreateSyllabus onNavigate={(tab, sub) => { setActiveTab(tab); if (sub) handleSubTabChange(tab, sub) }} />
+              ? <CreateSyllabus onNavigate={(tab, sub) => { setActiveTab(tab); if (sub) handleSubTabChange(tab, sub); setSidebarOpen(false) }} />
               : subTabs.syllabus === 'view'
-              ? <ViewSyllabus onNavigate={(tab, sub) => { setActiveTab(tab); if (sub) handleSubTabChange(tab, sub) }} />
-              : <AssignSyllabus onNavigate={(tab, sub) => { setActiveTab(tab); if (sub) handleSubTabChange(tab, sub) }} />
+              ? <ViewSyllabus onNavigate={(tab, sub) => { setActiveTab(tab); if (sub) handleSubTabChange(tab, sub); setSidebarOpen(false) }} />
+              : <AssignSyllabus onNavigate={(tab, sub) => { setActiveTab(tab); if (sub) handleSubTabChange(tab, sub); setSidebarOpen(false) }} />
           )}
           {activeTab === 'question-bank' && <QuestionBank tab={subTabs['question-bank']} onTabChange={(t) => handleSubTabChange('question-bank', t)} />}
           {activeTab === 'assign-test' && <AssignTest tab={subTabs['assign-test']} onTabChange={(t) => handleSubTabChange('assign-test', t)} />}
@@ -100,6 +110,7 @@ function App() {
               onNavigate={(tab, subTab) => {
                 setActiveTab(tab)
                 if (subTab) handleSubTabChange(tab, subTab)
+                setSidebarOpen(false)
               }}
             />
           )}

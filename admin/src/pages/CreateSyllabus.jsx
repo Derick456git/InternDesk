@@ -160,18 +160,26 @@ export default function CreateSyllabus({ onNavigate }) {
           {technologies.map((tech) => (
             <div
               key={tech._id}
+              onClick={() => {
+                setModalTech(tech.name)
+                setSelectedFile(null)
+                setUploadProgress(0)
+                setUploadStage('')
+              }}
               onMouseEnter={() => setHoveredTech(tech._id)}
               onMouseLeave={() => setHoveredTech(null)}
-              className="relative bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center justify-center min-h-[7.5rem] overflow-hidden transition-all hover:shadow-md group"
+              className="relative bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center min-h-[7.5rem] overflow-hidden transition-all hover:shadow-md cursor-pointer group"
             >
               <div className="text-center">
                 <span className="text-3xl block transition-transform group-hover:scale-110">{tech.icon || '🔹'}</span>
-                <h4 className="font-semibold text-gray-800 mt-2">{tech.name}</h4>
+                <h4 className="font-semibold text-gray-800 mt-2 text-sm sm:text-base">{tech.name}</h4>
+                <span className="text-xs text-orange-500 font-medium mt-1 sm:hidden inline-block">Tap to Upload →</span>
               </div>
               {hoveredTech === tech._id && (
-                <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center animate-fadeIn">
+                <div className="hidden sm:flex absolute inset-0 bg-black/40 backdrop-blur-[1px] items-center justify-center animate-fadeIn">
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation()
                       setModalTech(tech.name)
                       setSelectedFile(null)
                       setUploadProgress(0)

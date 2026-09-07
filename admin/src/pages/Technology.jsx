@@ -91,17 +91,17 @@ export default function Technology() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Manage Technology</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Add, edit, and manage technology tracks for courses and syllabuses.</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Manage Technology</h2>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Add, edit, and manage technology tracks for courses and syllabuses.</p>
         </div>
         <button
           onClick={() => {
             setAlert({ type: 'error', message: '' })
             setShowModal(true)
           }}
-          className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm cursor-pointer"
+          className="self-start sm:self-auto px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs sm:text-sm font-semibold rounded-xl transition-colors shadow-sm cursor-pointer whitespace-nowrap"
         >
           + Add Technology
         </button>

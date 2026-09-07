@@ -375,8 +375,8 @@ export default function ViewSyllabus({ onNavigate }) {
             </div>
 
             {/* Table */}
-            <div className="flex-1 overflow-y-auto border border-gray-100 rounded-xl">
-              <table className="w-full text-left text-xs">
+            <div className="flex-1 overflow-y-auto overflow-x-auto min-w-0 border border-gray-100 rounded-xl">
+              <table className="w-full min-w-[480px] text-left text-xs">
                 <thead className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-100 sticky top-0">
                   <tr>
                     <th className="px-4 py-3 w-16 text-center">Day</th>

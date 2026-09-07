@@ -221,7 +221,7 @@ export default function QuestionBank({ tab, onTabChange }) {
     <div className="space-y-5">
       <h2 className="text-2xl font-bold text-gray-800">Question Bank</h2>
 
-      <div className="flex gap-2 flex-wrap border-b border-gray-200 pb-3">
+      <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 border-b border-gray-200 scrollbar-none">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -232,9 +232,9 @@ export default function QuestionBank({ tab, onTabChange }) {
               }
               onTabChange(t.key)
             }}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-150 ${
+            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-colors duration-150 whitespace-nowrap cursor-pointer ${
               tab === t.key
-                ? 'bg-white text-orange-600 border border-b-white border-gray-200 -mb-[1px] shadow-sm'
+                ? 'bg-white text-orange-600 border border-b-white border-gray-200 -mb-[1px] shadow-sm font-bold'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
             }`}
           >
@@ -626,8 +626,8 @@ export default function QuestionBank({ tab, onTabChange }) {
               <div className="px-5 py-10 text-center text-gray-400 text-sm">No questions found matching criteria.</div>
             ) : (
               <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto min-w-0">
+                  <table className="w-full min-w-[720px] text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-100">
                         <th className="text-left px-5 py-3 font-semibold text-gray-600 w-12">SL No</th>

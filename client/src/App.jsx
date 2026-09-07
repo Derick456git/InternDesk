@@ -26,6 +26,7 @@ function AuthShell({ children }) {
 
 function Portal({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const pages = {
     dashboard: { component: Dashboard, label: 'Dashboard' },
@@ -37,19 +38,55 @@ function Portal({ user, onLogout }) {
     notifications: { component: Notifications, label: 'Notifications' },
     profile: { component: Profile, label: 'Profile' },
   }
-  const Page = pages[activeTab]?.component || Dashboard
+  const activePageMeta = pages[activeTab] || { component: Dashboard, label: 'Dashboard' }
+  const Page = activePageMeta.component
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
+    <div className="min-h-screen flex bg-gray-100 relative">
       <Sidebar
         active={activeTab}
-        onNavigate={setActiveTab}
+        onNavigate={(tab) => {
+          setActiveTab(tab)
+          setSidebarOpen(false)
+        }}
         user={user}
         onLogout={onLogout}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
-      <main className="flex-1 p-6 overflow-auto">
-        <Page user={user} onLogout={onLogout} onNavigate={setActiveTab} />
-      </main>
+      <div className="flex-1 flex flex-col lg:ml-64 min-w-0 w-full transition-all duration-300">
+        {/* Mobile Top Header */}
+        <header className="lg:hidden sticky top-0 z-30 bg-[#0f1a2e] text-white px-4 py-3 flex items-center justify-between shadow-md">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="w-9 h-9 flex items-center justify-center rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors cursor-pointer"
+              aria-label="Open Sidebar"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div>
+              <span className="font-bold text-base text-white block leading-tight">Intern Desk</span>
+              <span className="text-xs text-orange-400 font-medium">{activePageMeta.label}</span>
+            </div>
+          </div>
+
+          {user && (
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-xs font-bold text-white shadow-xs">
+                {user.name?.charAt(0).toUpperCase()}
+              </div>
+            </div>
+          )}
+        </header>
+
+        <main className="flex-1 p-3.5 sm:p-5 md:p-6 overflow-auto">
+          <Page user={user} onLogout={onLogout} onNavigate={setActiveTab} />
+        </main>
+      </div>
     </div>
   )
 }

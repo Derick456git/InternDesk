@@ -532,8 +532,8 @@ export default function UploadNotes({ onNavigate }) {
           <div className="px-6 py-10 text-center text-sm text-gray-400">No submissions yet.</div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto min-w-0">
+              <table className="w-full min-w-[550px] text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     <th className="text-left px-6 py-3">Technology</th>

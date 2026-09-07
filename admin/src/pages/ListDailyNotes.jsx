@@ -182,8 +182,8 @@ export default function ListDailyNotes() {
           <div className="px-5 py-10 text-center text-sm text-gray-400">No daily notes found.</div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto min-w-0">
+              <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="text-left px-5 py-3 font-semibold text-gray-600">Intern Name</th>

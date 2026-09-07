@@ -145,8 +145,8 @@ export default function ViewSyllabus() {
               </div>
             ) : details ? (
               <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto min-w-0">
+                  <table className="w-full min-w-[500px] text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-100">
                         <th className="text-left px-5 py-3 font-semibold text-gray-600">Syllabus Name</th>

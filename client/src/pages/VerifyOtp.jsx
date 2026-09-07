@@ -124,10 +124,10 @@ export default function VerifyOtp() {
   const isOtpComplete = otp.join('').length === 4
 
   return (
-    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 sm:p-8 mx-auto">
       <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Intern Desk</h1>
-        <p className="text-sm text-gray-500 mt-1">OTP Verification</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Intern Desk</h1>
+        <p className="text-xs sm:text-sm text-gray-500 mt-1">OTP Verification</p>
       </div>
 
       <form onSubmit={handleVerify} className="space-y-5">
@@ -143,7 +143,7 @@ export default function VerifyOtp() {
           </label>
           
           {/* Modern 4-Box Segmented OTP Inputs */}
-          <div className="flex justify-center gap-3 sm:gap-4 my-2" onPaste={handleOtpPaste}>
+          <div className="flex justify-center gap-2 sm:gap-4 my-2" onPaste={handleOtpPaste}>
             {otp.map((digit, i) => (
               <input
                 key={i}
@@ -155,7 +155,7 @@ export default function VerifyOtp() {
                 value={digit}
                 onChange={(e) => handleOtpChange(i, e.target.value)}
                 onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                className={`w-14 h-14 sm:w-16 sm:h-16 text-center text-2xl font-extrabold rounded-2xl border-2 outline-none transition-all duration-150 ${
+                className={`w-11 h-12 sm:w-16 sm:h-16 text-center text-xl sm:text-2xl font-extrabold rounded-xl sm:rounded-2xl border-2 outline-none transition-all duration-150 ${
                   digit
                     ? 'border-orange-500 bg-orange-50/50 text-orange-950 shadow-sm ring-2 ring-orange-200/50'
                     : 'border-gray-200 bg-gray-50/60 text-gray-800 hover:border-gray-300 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100'

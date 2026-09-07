@@ -28,7 +28,7 @@ const menuItems = [
   { id: 'notifications', label: 'Notifications', disabled: false },
 ]
 
-export default function Sidebar({ activeTab, onTabChange, subTabs, onSubTabChange }) {
+export default function Sidebar({ activeTab, onTabChange, subTabs, onSubTabChange, isOpen, onClose }) {
   const [openMenu, setOpenMenu] = useState('question-bank')
 
   const toggleMenu = (id) => {
@@ -36,11 +36,35 @@ export default function Sidebar({ activeTab, onTabChange, subTabs, onSubTabChang
   }
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-[#0f1a2e] flex flex-col z-50">
-      <div className="p-5 border-b border-white/10">
-        <h1 className="text-white text-xl font-bold tracking-wide">Intern Desk</h1>
-        <p className="text-blue-200 text-xs mt-0.5">Admin Portal</p>
-      </div>
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-xs transition-opacity"
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`fixed left-0 top-0 h-full w-64 bg-[#0f1a2e] flex flex-col z-50 transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none ${
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        <div className="p-5 border-b border-white/10 flex items-center justify-between">
+          <div>
+            <h1 className="text-white text-xl font-bold tracking-wide">Intern Desk</h1>
+            <p className="text-blue-200 text-xs mt-0.5">Admin Portal</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="lg:hidden p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+            aria-label="Close Sidebar"
+          >
+            ✕
+          </button>
+        </div>
       <nav className="flex-1 py-3 overflow-y-auto">
         <button
           onClick={() => onTabChange('dashboard')}
@@ -124,6 +148,7 @@ export default function Sidebar({ activeTab, onTabChange, subTabs, onSubTabChang
       <div className="p-4 border-t border-white/10">
         <p className="text-blue-200/60 text-xs">Intern Desk v1.0</p>
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }

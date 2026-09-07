@@ -293,13 +293,13 @@ export default function EvaluationResult() {
             </div>
 
             {/* Score & Passing Status Bar */}
-            <div className="flex items-center justify-between p-3.5 bg-orange-50/70 rounded-xl border border-orange-200 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3.5 bg-orange-50/70 rounded-xl border border-orange-200 mb-4">
               <div className="text-xs text-gray-600 space-y-0.5">
                 <p className="font-semibold text-gray-800">Format: 5 Objective (10M) + 5 Descriptive (25M) = 35 Marks</p>
-                <p className="text-gray-500">Passing Threshold: $\ge 21$ Marks (60%)</p>
+                <p className="text-gray-500">Passing Threshold: &ge; 21 Marks (60%)</p>
               </div>
-              <div className="text-right">
-                <span className="text-lg font-black text-gray-900">
+              <div className="sm:text-right">
+                <span className="text-base sm:text-lg font-black text-gray-900">
                   Total: <span className="text-orange-600">{currentTotal}</span> / 35 ({currentPercentage}%)
                 </span>
                 <span className={`block text-xs font-bold mt-0.5 ${isPassed ? 'text-green-600' : 'text-red-600'}`}>
@@ -322,8 +322,8 @@ export default function EvaluationResult() {
                   const isCorrect = isObj && currentMark === 2
 
                   return (
-                    <div key={i} className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 space-y-3">
-                      <div className="flex items-start justify-between gap-3">
+                    <div key={i} className="border border-gray-200 rounded-xl p-3.5 sm:p-4 bg-gray-50/50 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 sm:gap-3">
                         <div className="flex items-start gap-2.5">
                           <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                             {i + 1}

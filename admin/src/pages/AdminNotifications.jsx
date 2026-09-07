@@ -239,7 +239,7 @@ export default function AdminNotifications({ onNavigate }) {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-1">
           <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Total Alerts</span>
           <p className="text-2xl font-black text-gray-900">{notifications.length}</p>

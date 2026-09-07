@@ -164,7 +164,7 @@ export default function AuthFlow({ onLogin }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f1a2e] to-[#1a2d4a]">
       {view === 'login' && (
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 mx-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 sm:p-8 mx-3 sm:mx-4">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800">Intern Desk</h1>
             <p className="text-sm text-gray-500 mt-1">Admin Portal Login</p>
@@ -234,7 +234,7 @@ export default function AuthFlow({ onLogin }) {
       )}
 
       {view === 'forgot-password' && (
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 mx-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 sm:p-8 mx-3 sm:mx-4">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800">Forgot Password</h1>
             <p className="text-sm text-gray-500 mt-2">
@@ -275,7 +275,7 @@ export default function AuthFlow({ onLogin }) {
       )}
 
       {view === 'otp-verification' && (
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 mx-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 sm:p-8 mx-3 sm:mx-4">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800">OTP Verification</h1>
             <p className="text-sm text-gray-500 mt-2">
@@ -285,7 +285,7 @@ export default function AuthFlow({ onLogin }) {
           <form onSubmit={handleOtpVerify} className="space-y-5">
             <AlertBanner type={alert.type} message={alert.message} onClose={() => setAlert({ type: 'success', message: '' })} />
             
-            <div className="flex justify-center gap-3">
+            <div className="flex justify-center gap-2 sm:gap-3">
               {otp.map((digit, i) => (
                 <input
                   key={i}
@@ -296,7 +296,7 @@ export default function AuthFlow({ onLogin }) {
                   value={digit}
                   onChange={(e) => handleOtpChange(i, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                  className="w-14 h-14 text-center text-xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition bg-white"
+                  className="w-11 sm:w-14 h-12 sm:h-14 text-center text-lg sm:text-xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition bg-white"
                 />
               ))}
             </div>

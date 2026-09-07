@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../api'
 
-export default function Navbar({ user, onLogout, onNavigate }) {
+export default function Navbar({ user, onLogout, onNavigate, onToggleSidebar }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [toastAlert, setToastAlert] = useState(null)
   const prevCountRef = useRef(0)
@@ -56,27 +56,43 @@ export default function Navbar({ user, onLogout, onNavigate }) {
   }
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shadow-xs sticky top-0 z-30">
-      <div>
-        <h2 className="text-lg font-bold text-gray-800">Intern Desk &mdash; Admin Portal</h2>
+    <header className="bg-white border-b border-gray-200 px-3.5 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between shadow-xs sticky top-0 z-30 min-w-0">
+      <div className="flex items-center gap-2.5 min-w-0">
+        {/* Hamburger Menu Toggle Button for Mobile */}
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="lg:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer border border-gray-200"
+          aria-label="Toggle Navigation Menu"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+
+        <div className="min-w-0">
+          <h2 className="text-sm sm:text-base md:text-lg font-bold text-gray-800 truncate">
+            Intern Desk <span className="hidden sm:inline">&mdash; Admin Portal</span>
+          </h2>
+        </div>
       </div>
 
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
         {/* Real-time Visual Alert Toast Banner */}
         {toastAlert && (
           <div
             onClick={() => handleNotificationToastClick(toastAlert)}
-            className="flex items-center gap-3 px-4 py-2 bg-gray-900 text-white text-xs rounded-xl shadow-xl cursor-pointer hover:bg-black transition-all animate-bounce"
+            className="hidden md:flex items-center gap-3 px-3.5 py-1.5 bg-gray-900 text-white text-xs rounded-xl shadow-xl cursor-pointer hover:bg-black transition-all animate-bounce max-w-xs"
             title="Click to view full notification details"
           >
             <span className="text-base">{getToastIcon(toastAlert.type)}</span>
-            <div className="max-w-xs truncate">
+            <div className="truncate">
               <strong className="block text-white font-bold truncate">
                 {toastAlert.title || 'New Intern Submission'}
               </strong>
               <span className="text-gray-300 truncate block text-[11px]">{toastAlert.message}</span>
             </div>
-            <span className="text-[10px] text-orange-400 font-bold ml-1 whitespace-nowrap">View All &rarr;</span>
+            <span className="text-[10px] text-orange-400 font-bold ml-1 whitespace-nowrap">View &rarr;</span>
           </div>
         )}
 
@@ -84,7 +100,7 @@ export default function Navbar({ user, onLogout, onNavigate }) {
         <button
           type="button"
           onClick={() => onNavigate && onNavigate('notifications')}
-          className="relative p-2.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all focus:outline-none cursor-pointer flex items-center justify-center border border-gray-100 hover:border-gray-200"
+          className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all focus:outline-none cursor-pointer flex items-center justify-center border border-gray-100 hover:border-gray-200"
           aria-label="Notifications"
           title="View All Intern Notifications"
         >
@@ -99,22 +115,22 @@ export default function Navbar({ user, onLogout, onNavigate }) {
           {/* Unread Badge Counter & Ping Alert */}
           {unreadCount > 0 && (
             <>
-              <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-orange-500 px-1 text-[11px] font-black text-white shadow-xs border-2 border-white">
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] sm:h-5 sm:min-w-[20px] items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] sm:text-[11px] font-black text-white shadow-xs border-2 border-white">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
-              <span className="absolute -top-1 -right-1 h-5 w-5 animate-ping rounded-full bg-orange-400 opacity-60 pointer-events-none" />
+              <span className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 animate-ping rounded-full bg-orange-400 opacity-60 pointer-events-none" />
             </>
           )}
         </button>
 
         {/* User Greeting & Logout */}
-        <div className="flex items-center gap-3 pl-2 border-l border-gray-200">
-          <span className="text-xs text-gray-600 hidden sm:inline">
+        <div className="flex items-center gap-2 sm:gap-3 pl-2 border-l border-gray-200">
+          <span className="text-xs text-gray-600 hidden md:inline">
             Welcome, <span className="font-bold text-gray-800">{user?.name || 'Admin'}</span>
           </span>
           <button
             onClick={onLogout}
-            className="px-3.5 py-1.5 text-xs font-bold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors duration-150 cursor-pointer shadow-2xs"
+            className="px-2.5 sm:px-3.5 py-1.5 text-xs font-bold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors duration-150 cursor-pointer shadow-2xs whitespace-nowrap"
           >
             Logout
           </button>
