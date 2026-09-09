@@ -4,8 +4,8 @@ exports.getByEmail = async (req, res) => {
   try {
     const email = (req.intern?.email || req.query.email || '').toLowerCase().trim()
     const filter = email
-      ? { email, recipientRole: { $ne: 'admin' } }
-      : { recipientRole: { $ne: 'admin' } }
+      ? { email, recipientRole: 'intern' }
+      : { recipientRole: 'intern' }
 
     const notifications = await Notification.find(filter).sort({ createdAt: -1 }).lean()
     const mapped = notifications.map((n) => ({
@@ -22,10 +22,7 @@ exports.getByEmail = async (req, res) => {
 exports.getAdminNotifications = async (req, res) => {
   try {
     const filter = {
-      $or: [
-        { recipientRole: 'admin' },
-        { type: { $in: ['note_submitted', 'test_submitted', 'task_submitted', 'course_completed'] } },
-      ],
+      recipientRole: 'admin',
     }
 
     const notifications = await Notification.find(filter).sort({ createdAt: -1 }).limit(100).lean()
@@ -67,12 +64,7 @@ exports.markRead = async (req, res) => {
 exports.markAllAdminRead = async (req, res) => {
   try {
     await Notification.updateMany(
-      {
-        $or: [
-          { recipientRole: 'admin' },
-          { type: { $in: ['note_submitted', 'test_submitted', 'task_submitted', 'course_completed'] } },
-        ],
-      },
+      { recipientRole: 'admin' },
       { $set: { read: true, isRead: true } }
     )
 
@@ -85,10 +77,7 @@ exports.markAllAdminRead = async (req, res) => {
 exports.clearAdminNotifications = async (req, res) => {
   try {
     await Notification.deleteMany({
-      $or: [
-        { recipientRole: 'admin' },
-        { type: { $in: ['note_submitted', 'test_submitted', 'task_submitted', 'course_completed'] } },
-      ],
+      recipientRole: 'admin',
       read: true,
     })
     res.json({ success: true, message: 'Read admin notifications cleared.' })
