@@ -195,7 +195,7 @@ export default function UploadNotes({ onNavigate }) {
     if (lockStatus.isLocked) {
       return setAlert({
         type: 'error',
-        message: lockStatus.reason || `You must attend and submit Test ${lockStatus.blockedByTest} in 'Attend Test' before uploading Day ${dayNumber} notes.`,
+        message: lockStatus.reason || `You must attend and submit Test ${lockStatus.blockedByTest} in 'Attend Test'`,
       })
     }
 

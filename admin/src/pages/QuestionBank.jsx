@@ -39,6 +39,7 @@ export default function QuestionBank({ tab, onTabChange }) {
 
   useEffect(() => {
     fetchQuestions()
+    fetchTopics()
     fetchTechnologies()
   }, [])
 
@@ -51,44 +52,67 @@ export default function QuestionBank({ tab, onTabChange }) {
     }
   }
 
+  const fetchTopics = async () => {
+    try {
+      const res = await api.get('/topics')
+      setTopics(res.data || [])
+    } catch (err) {
+      console.error('Fetch topics error:', err)
+    }
+  }
+
   const fetchQuestions = async () => {
     try {
       const res = await api.get('/questions')
       setQuestions(res.data || [])
-      const uniqueTopics = [...new Set((res.data || []).map((q) => q.topic).filter(Boolean))]
-      setTopics(uniqueTopics.map((t) => ({ id: t, title: t })))
     } catch (err) {
       console.error('Fetch questions error:', err)
     }
   }
 
-  const addTopic = () => {
+  const addTopic = async () => {
     if (!topicInput.trim()) return
     const title = topicInput.trim()
-    if (topics.find((t) => t.title.toLowerCase() === title.toLowerCase())) {
+    if (topics.find((t) => (t.name || t.title || '').toLowerCase() === title.toLowerCase())) {
       setAlert({ type: 'error', message: `Topic "${title}" already exists.` })
       return
     }
-    setTopics((prev) => [...prev, { id: title, title }])
-    setTopicInput('')
-    setAlert({ type: 'success', message: `Topic "${title}" added successfully.` })
+    try {
+      const res = await api.post('/topics', { name: title })
+      const createdTopic = res.data || { _id: title, name: title }
+      setTopics((prev) => [...prev, createdTopic])
+      setTopicInput('')
+      setAlert({ type: 'success', message: `Topic "${title}" added successfully.` })
+    } catch (err) {
+      console.error('Add topic error:', err)
+      setAlert({ type: 'error', message: err.message || `Failed to add topic "${title}".` })
+    }
   }
 
   const handleOpenDeleteTopic = (topic) => {
     setDeleteTopicModal(topic)
   }
 
-  const handleConfirmDeleteTopic = () => {
+  const handleConfirmDeleteTopic = async () => {
     if (!deleteTopicModal) return
-    const { id, title } = deleteTopicModal
-    const nextTopics = topics.filter((t) => t.id !== id)
-    setTopics(nextTopics)
-    const newTotalPages = Math.ceil(nextTopics.length / TOPICS_PER_PAGE) || 1
-    if (topicPage > newTotalPages) {
-      setTopicPage(newTotalPages)
+    const topicId = deleteTopicModal._id || deleteTopicModal.id
+    const topicTitle = deleteTopicModal.name || deleteTopicModal.title
+    try {
+      if (deleteTopicModal._id) {
+        await api.delete(`/topics/${deleteTopicModal._id}`)
+      }
+      const nextTopics = topics.filter((t) => (t._id || t.id) !== topicId && (t.name || t.title) !== topicTitle)
+      setTopics(nextTopics)
+      const newTotalPages = Math.ceil(nextTopics.length / TOPICS_PER_PAGE) || 1
+      if (topicPage > newTotalPages) {
+        setTopicPage(newTotalPages)
+      }
+      setAlert({ type: 'success', message: `Topic "${topicTitle}" has been deleted.` })
+      setDeleteTopicModal(null)
+    } catch (err) {
+      console.error('Delete topic error:', err)
+      setAlert({ type: 'error', message: err.message || 'Failed to delete topic.' })
     }
-    setAlert({ type: 'success', message: `Topic "${title}" has been deleted.` })
-    setDeleteTopicModal(null)
   }
 
   const updateOption = (index, value) => {
@@ -200,7 +224,7 @@ export default function QuestionBank({ tab, onTabChange }) {
 
   // Topics filtering and pagination (8 per page)
   const filteredTopics = topics.filter((t) =>
-    topicSearch ? t.title.toLowerCase().includes(topicSearch.toLowerCase()) : true
+    topicSearch ? (t.name || t.title || '').toLowerCase().includes(topicSearch.toLowerCase()) : true
   )
   const totalTopicPages = Math.ceil(filteredTopics.length / TOPICS_PER_PAGE) || 1
   const paginatedTopics = filteredTopics.slice(
@@ -214,7 +238,7 @@ export default function QuestionBank({ tab, onTabChange }) {
   }
 
   const associatedQuestionsCount = deleteTopicModal
-    ? questions.filter((q) => q.topic?.toLowerCase() === deleteTopicModal.title?.toLowerCase()).length
+    ? questions.filter((q) => q.topic?.toLowerCase() === (deleteTopicModal.name || deleteTopicModal.title)?.toLowerCase()).length
     : 0
 
   return (
@@ -322,17 +346,18 @@ export default function QuestionBank({ tab, onTabChange }) {
               <>
                 <div className="divide-y divide-gray-100">
                   {paginatedTopics.map((t, idx) => {
-                    const count = questions.filter((q) => q.topic?.toLowerCase() === t.title?.toLowerCase()).length
+                    const topicTitle = t.name || t.title
+                    const count = questions.filter((q) => q.topic?.toLowerCase() === topicTitle?.toLowerCase()).length
                     const serialNo = (topicPage - 1) * TOPICS_PER_PAGE + idx + 1
 
                     return (
-                      <div key={t.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-orange-50/50 transition-colors">
+                      <div key={t._id || t.id || topicTitle} className="px-5 py-3.5 flex items-center justify-between hover:bg-orange-50/50 transition-colors">
                         <div className="flex items-center gap-3">
                           <span className="w-7 h-7 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
                             {serialNo}
                           </span>
                           <div>
-                            <span className="text-sm font-bold text-gray-800 block">{t.title}</span>
+                            <span className="text-sm font-bold text-gray-800 block">{topicTitle}</span>
                             <span className="text-xs text-gray-400">{count} associated question(s)</span>
                           </div>
                         </div>
@@ -427,9 +452,12 @@ export default function QuestionBank({ tab, onTabChange }) {
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
                 >
                   <option value="">Select topic</option>
-                  {topics.map((t) => (
-                    <option key={t.id} value={t.title}>{t.title}</option>
-                  ))}
+                  {topics.map((t) => {
+                    const topicTitle = t.name || t.title
+                    return (
+                      <option key={t._id || t.id || topicTitle} value={topicTitle}>{topicTitle}</option>
+                    )
+                  })}
                 </select>
               </div>
             </div>
@@ -564,9 +592,12 @@ export default function QuestionBank({ tab, onTabChange }) {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-400 outline-none"
                 >
                   <option value="">All Topics</option>
-                  {topics.map((t) => (
-                    <option key={t.id} value={t.title}>{t.title}</option>
-                  ))}
+                  {topics.map((t) => {
+                    const topicTitle = t.name || t.title
+                    return (
+                      <option key={t._id || t.id || topicTitle} value={topicTitle}>{topicTitle}</option>
+                    )
+                  })}
                 </select>
               </div>
 
@@ -747,12 +778,12 @@ export default function QuestionBank({ tab, onTabChange }) {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Confirm Topic Deletion</h3>
-                <p className="text-xs text-gray-500">Topic: {deleteTopicModal.title}</p>
+                <p className="text-xs text-gray-500">Topic: {deleteTopicModal.name || deleteTopicModal.title}</p>
               </div>
             </div>
 
             <p className="text-sm text-gray-600 leading-relaxed">
-              Are you sure you want to delete the topic <strong className="text-gray-900">"{deleteTopicModal.title}"</strong>?
+              Are you sure you want to delete the topic <strong className="text-gray-900">"{deleteTopicModal.name || deleteTopicModal.title}"</strong>?
             </p>
 
             {associatedQuestionsCount > 0 && (
