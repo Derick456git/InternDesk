@@ -4,6 +4,7 @@ const SyllabusAssignment = require('../Models/syllabusAssignmentModel')
 const Syllabus = require('../Models/syllabusModel')
 const Test = require('../Models/testModel')
 const TestSubmission = require('../Models/testSubmissionModel')
+const Evaluation = require('../Models/evaluationModel')
 const DailyNote = require('../Models/dailyNoteModel')
 const Task = require('../Models/taskModel')
 const Notification = require('../Models/notificationModel')
@@ -231,20 +232,43 @@ exports.getInternSummary = async (req, res) => {
 
     const submittedTestIds = new Set(submissions.map((s) => String(s.testId)))
 
-    const testsBreakdown = submissions.map((s) => ({
-      _id: s._id,
-      testName: s.testName,
-      assessmentNumber: s.assessmentNumber || 1,
-      objectiveScore: s.objectiveScore || 0,
-      descriptiveScore: s.descriptiveScore || 0,
-      totalScore: s.totalScore || s.totalMarksObtained || 0,
-      maxMarks: 35,
-      percentage: s.percentage || Number((((s.totalScore || 0) / 35) * 100).toFixed(1)),
-      resultStatus: s.resultStatus || (s.totalScore >= 21 ? 'Passed' : 'Failed'),
-      status: s.status || 'Completed',
-      submittedAt: s.submittedAt,
-      evaluatedBy: s.evaluatedBy || 'Admin',
-    }))
+    // Check evaluations collection for published/completed statuses
+    const evaluations = await Evaluation.find({
+      internName: { $regex: new RegExp(`^${internName}$`, 'i') },
+      ...(tech ? { technology: { $regex: new RegExp(`^${tech}$`, 'i') } } : {}),
+    }).lean()
+
+    const evalMap = new Map()
+    evaluations.forEach((ev) => {
+      if (ev.testName) evalMap.set(ev.testName.toLowerCase().trim(), ev)
+    })
+
+    const testsBreakdown = submissions.map((s) => {
+      const matchingEval = evalMap.get((s.testName || '').toLowerCase().trim())
+      const isEvaluated =
+        (s.status === 'Completed' || s.status === 'Published' || s.isPublished || matchingEval?.status === 'Published') &&
+        (s.resultStatus === 'passed' || s.resultStatus === 'failed' || s.resultStatus === 'Passed' || s.resultStatus === 'Failed' || matchingEval?.totalScore)
+
+      const resultStatus = isEvaluated
+        ? ((s.resultStatus?.toLowerCase() === 'passed' || (s.totalScore !== undefined && s.totalScore >= 21) || (matchingEval?.totalScore && parseInt(matchingEval.totalScore) >= 21)) ? 'Passed' : 'Failed')
+        : 'Pending'
+
+      return {
+        _id: s._id,
+        testName: s.testName,
+        assessmentNumber: s.assessmentNumber || 1,
+        isPending: resultStatus === 'Pending',
+        objectiveScore: resultStatus === 'Pending' ? null : (s.objectiveScore ?? null),
+        descriptiveScore: resultStatus === 'Pending' ? null : (s.descriptiveScore ?? null),
+        totalScore: resultStatus === 'Pending' ? null : (s.totalScore ?? s.totalMarksObtained ?? null),
+        maxMarks: 35,
+        percentage: resultStatus === 'Pending' ? null : (s.percentage ?? (s.totalScore ? Number(((s.totalScore / 35) * 100).toFixed(1)) : null)),
+        resultStatus,
+        status: s.status || 'Pending Evaluation',
+        submittedAt: s.submittedAt,
+        evaluatedBy: s.evaluatedBy || matchingEval?.evaluatedBy || '',
+      }
+    })
 
     const pendingTests = assignedTests.filter((t) => !submittedTestIds.has(String(t._id)))
 
@@ -282,11 +306,12 @@ exports.getInternSummary = async (req, res) => {
     }).lean()
 
     // 7. Overall Summary
-    const passedTestsCount = testsBreakdown.filter((t) => t.resultStatus?.toLowerCase() === 'passed').length
-    const totalScoreSum = testsBreakdown.reduce((acc, t) => acc + (t.totalScore || 0), 0)
-    const avgTestPercentage = testsBreakdown.length > 0
-      ? (testsBreakdown.reduce((acc, t) => acc + (t.percentage || 0), 0) / testsBreakdown.length).toFixed(1)
-      : '0.0'
+    const evaluatedTests = testsBreakdown.filter((t) => !t.isPending && (t.resultStatus === 'Passed' || t.resultStatus === 'Failed'))
+    const passedTestsCount = evaluatedTests.filter((t) => t.resultStatus === 'Passed').length
+    const totalScoreSum = evaluatedTests.reduce((acc, t) => acc + (t.totalScore || 0), 0)
+    const avgTestPercentage = evaluatedTests.length > 0
+      ? (evaluatedTests.reduce((acc, t) => acc + (Number(t.percentage) || 0), 0) / evaluatedTests.length).toFixed(1)
+      : '—'
 
     res.json({
       success: true,

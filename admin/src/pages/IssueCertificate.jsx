@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { jsPDF } from 'jspdf'
 import { api } from '../api'
 import AlertBanner from '../components/AlertBanner'
 
@@ -214,9 +215,9 @@ export default function IssueCertificate({ onNavigate }) {
   const handleOpenIssueModal = (intern) => {
     setSelectedInternForCert(intern)
     const today = new Date().toISOString().split('T')[0]
-    const from = intern.issuedFromDate || intern.startDate || today
-    const to = intern.issuedToDate || intern.endDate || today
-    const issue = intern.issueDate || today
+    const from = (intern.issuedFromDate && intern.issuedFromDate >= today) ? intern.issuedFromDate : today
+    const to = (intern.issuedToDate && intern.issuedToDate >= from) ? intern.issuedToDate : today
+    const issue = (intern.issueDate && intern.issueDate >= today) ? intern.issueDate : today
 
     setCertForm({
       internName: intern.internName || '',
@@ -232,6 +233,24 @@ export default function IssueCertificate({ onNavigate }) {
     if (!certForm.internName || !certForm.technology) return
     if (!certForm.fromDate || !certForm.toDate || !certForm.issueDate) {
       setAlert({ type: 'error', message: 'Please provide From Date, To Date, and Date of Issue.' })
+      return
+    }
+
+    const today = new Date().toISOString().split('T')[0]
+    if (certForm.fromDate < today) {
+      setAlert({ type: 'error', message: 'From Date cannot be a previous date. Please select today or a future date.' })
+      return
+    }
+    if (certForm.toDate < today) {
+      setAlert({ type: 'error', message: 'To Date cannot be a previous date. Please select today or a future date.' })
+      return
+    }
+    if (certForm.toDate < certForm.fromDate) {
+      setAlert({ type: 'error', message: 'To Date cannot be earlier than From Date.' })
+      return
+    }
+    if (certForm.issueDate < today) {
+      setAlert({ type: 'error', message: 'Date of Issue cannot be a previous date. Please select today or a future date.' })
       return
     }
 
@@ -253,23 +272,27 @@ export default function IssueCertificate({ onNavigate }) {
         },
       })
 
-      // 2. Export and download certificate image from canvas
+      // 2. Export and download certificate as PDF
       const canvas = canvasRef.current
       if (canvas) {
-        const dataUrl = canvas.toDataURL('image/png', 1.0)
-        const link = document.createElement('a')
+        const imgData = canvas.toDataURL('image/jpeg', 0.98)
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+        })
+        const pdfWidth = pdf.internal.pageSize.getWidth()
+        const pdfHeight = pdf.internal.pageSize.getHeight()
+
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST')
         const safeName = certForm.internName.replace(/[^a-zA-Z0-9_-]/g, '_')
         const safeTech = certForm.technology.replace(/[^a-zA-Z0-9_-]/g, '_')
-        link.download = `Certificate_${safeName}_${safeTech}.png`
-        link.href = dataUrl
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        pdf.save(`Certificate_${safeName}_${safeTech}.pdf`)
       }
 
       setAlert({
         type: 'success',
-        message: `Certificate for ${certForm.internName} saved and downloaded successfully!`,
+        message: `Certificate for ${certForm.internName} saved and downloaded as PDF successfully!`,
       })
       setIssueModalOpen(false)
       fetchCompletedInterns()
@@ -298,10 +321,10 @@ export default function IssueCertificate({ onNavigate }) {
 
   const totalPages = Math.max(1, Math.ceil(filteredInterns.length / ITEMS_PER_PAGE))
   const paginatedInterns = filteredInterns.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
-
   const totalCompletedCount = interns.length
   const issuedCount = interns.filter((i) => i.isIssued).length
   const pendingCount = totalCompletedCount - issuedCount
+  const today = new Date().toISOString().split('T')[0]
 
   return (
     <div className="space-y-6">
@@ -626,7 +649,9 @@ export default function IssueCertificate({ onNavigate }) {
                     <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
                       <p className="text-xs text-gray-500 font-medium">Avg Test Score</p>
                       <p className="text-xl font-bold text-blue-600">
-                        {selectedInternSummary.tests?.avgPercentage}%
+                        {selectedInternSummary.tests?.avgPercentage && selectedInternSummary.tests?.avgPercentage !== '—'
+                          ? `${selectedInternSummary.tests?.avgPercentage}%`
+                          : '—'}
                       </p>
                     </div>
 
@@ -669,26 +694,52 @@ export default function IssueCertificate({ onNavigate }) {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50">
-                            {selectedInternSummary.tests?.list?.map((t, idx) => (
-                              <tr key={t._id || idx} className="hover:bg-gray-50/60">
-                                <td className="px-3.5 py-2 font-medium text-gray-800">
-                                  {t.testName || `Assessment ${t.assessmentNumber}`}
-                                </td>
-                                <td className="px-3.5 py-2 text-gray-600">{t.objectiveScore} marks</td>
-                                <td className="px-3.5 py-2 text-gray-600">{t.descriptiveScore} marks</td>
-                                <td className="px-3.5 py-2 font-bold text-gray-900">{t.totalScore} / 35</td>
-                                <td className="px-3.5 py-2 text-blue-700 font-semibold">{t.percentage}%</td>
-                                <td className="px-3.5 py-2">
-                                  <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                                    t.resultStatus?.toLowerCase() === 'passed'
-                                      ? 'bg-green-100 text-green-700'
-                                      : 'bg-red-100 text-red-700'
-                                  }`}>
-                                    {t.resultStatus || 'Completed'}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
+                            {selectedInternSummary.tests?.list?.map((t, idx) => {
+                              const isEvaluated = t.resultStatus?.toLowerCase() === 'passed' || t.resultStatus?.toLowerCase() === 'failed'
+
+                              return (
+                                <tr key={t._id || idx} className="hover:bg-gray-50/60">
+                                  <td className="px-3.5 py-2 font-medium text-gray-800">
+                                    {t.testName || `Assessment ${t.assessmentNumber}`}
+                                  </td>
+                                  <td className="px-3.5 py-2 text-gray-600">
+                                    {isEvaluated && t.objectiveScore !== null && t.objectiveScore !== undefined
+                                      ? `${t.objectiveScore} marks`
+                                      : '—'}
+                                  </td>
+                                  <td className="px-3.5 py-2 text-gray-600">
+                                    {isEvaluated && t.descriptiveScore !== null && t.descriptiveScore !== undefined
+                                      ? `${t.descriptiveScore} marks`
+                                      : '—'}
+                                  </td>
+                                  <td className="px-3.5 py-2 font-bold text-gray-900">
+                                    {isEvaluated && t.totalScore !== null && t.totalScore !== undefined
+                                      ? `${t.totalScore} / 35`
+                                      : '—'}
+                                  </td>
+                                  <td className="px-3.5 py-2 text-blue-700 font-semibold">
+                                    {isEvaluated && t.percentage !== null && t.percentage !== undefined
+                                      ? `${t.percentage}%`
+                                      : '—'}
+                                  </td>
+                                  <td className="px-3.5 py-2">
+                                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                      t.resultStatus?.toLowerCase() === 'passed'
+                                        ? 'bg-green-100 text-green-700'
+                                        : t.resultStatus?.toLowerCase() === 'failed'
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-amber-100 text-amber-700'
+                                    }`}>
+                                      {t.resultStatus?.toLowerCase() === 'passed'
+                                        ? 'Passed'
+                                        : t.resultStatus?.toLowerCase() === 'failed'
+                                        ? 'Failed'
+                                        : 'Pending'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              )
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -710,7 +761,7 @@ export default function IssueCertificate({ onNavigate }) {
                         </span>
                       </h6>
                       {selectedInternSummary.tests?.pending?.length === 0 ? (
-                        <p className="text-xs text-green-700">✓ All scheduled tests have been attended and evaluated.</p>
+                        <p className="text-xs text-green-700">✓ All scheduled tests have been attended.</p>
                       ) : (
                         <ul className="text-xs text-gray-600 space-y-1">
                           {selectedInternSummary.tests?.pending?.map((p, i) => (
@@ -869,23 +920,47 @@ export default function IssueCertificate({ onNavigate }) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      From Date * <span className="text-orange-500 font-normal">(Calendar)</span>
+                      From Date * <span className="text-orange-500 font-normal">(Today/Future)</span>
                     </label>
                     <input
                       type="date"
                       value={certForm.fromDate}
-                      onChange={(e) => setCertForm((prev) => ({ ...prev, fromDate: e.target.value }))}
+                      min={today}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val && val < today) {
+                          setAlert({ type: 'error', message: 'Previous dates cannot be selected for From Date.' })
+                          return
+                        }
+                        setCertForm((prev) => ({
+                          ...prev,
+                          fromDate: val,
+                          toDate: prev.toDate && prev.toDate < val ? val : prev.toDate,
+                        }))
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      To Date * <span className="text-orange-500 font-normal">(Calendar)</span>
+                      To Date * <span className="text-orange-500 font-normal">(Today/Future)</span>
                     </label>
                     <input
                       type="date"
                       value={certForm.toDate}
-                      onChange={(e) => setCertForm((prev) => ({ ...prev, toDate: e.target.value }))}
+                      min={certForm.fromDate && certForm.fromDate > today ? certForm.fromDate : today}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        const minAllowed = certForm.fromDate || today
+                        if (val && val < minAllowed) {
+                          setAlert({
+                            type: 'error',
+                            message: val < today ? 'Previous dates cannot be selected for To Date.' : 'To Date cannot be earlier than From Date.',
+                          })
+                          return
+                        }
+                        setCertForm((prev) => ({ ...prev, toDate: val }))
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition"
                     />
                   </div>
@@ -894,12 +969,20 @@ export default function IssueCertificate({ onNavigate }) {
                 {/* 4. Date of Issue (Dynamic Calendar) */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Date of Issue * <span className="text-orange-500 font-normal">(Calendar)</span>
+                    Date of Issue * <span className="text-orange-500 font-normal">(Today/Future)</span>
                   </label>
                   <input
                     type="date"
                     value={certForm.issueDate}
-                    onChange={(e) => setCertForm((prev) => ({ ...prev, issueDate: e.target.value }))}
+                    min={today}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      if (val && val < today) {
+                        setAlert({ type: 'error', message: 'Previous dates cannot be selected for Date of Issue.' })
+                        return
+                      }
+                      setCertForm((prev) => ({ ...prev, issueDate: val }))
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition"
                   />
                 </div>

@@ -13,6 +13,7 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     enum: [
       'course_completed',
+      'certificate_issued',
       'task_assigned',
       'test_unlocked',
       'result_published',
