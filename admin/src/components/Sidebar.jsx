@@ -26,6 +26,7 @@ const menuItems = [
     { key: 'view-submissions', label: 'View Submissions' },
   ]},
   { id: 'progress', label: 'View Progress', disabled: false },
+  { id: 'issue-certificate', label: 'Issue Certificate', disabled: false },
   { id: 'notifications', label: 'Notifications', disabled: false },
 ]
 

@@ -19,6 +19,7 @@ const adminDailyNoteRouter = require('./adminDailyNoteRouter')
 const clientTestRouter = require('./clientTestRouter')
 const assignCourseRouter = require('./assignCourseRouter')
 const topicRouter = require('./topicRouter')
+const certificateRouter = require('./certificateRouter')
 
 const router = Router()
 
@@ -42,5 +43,6 @@ router.use('/client/daily-notes', clientDailyNoteRouter)
 router.use('/admin/daily-notes', adminDailyNoteRouter)
 router.use('/client', clientTestRouter)
 router.use('/admin', assignCourseRouter)
+router.use('/certificates', certificateRouter)
 
 module.exports = router

@@ -14,6 +14,7 @@ import AssignTest from './pages/AssignTest'
 import EvaluationResult from './pages/EvaluationResult'
 import TaskManagement from './pages/TaskManagement'
 import ViewProgress from './pages/ViewProgress'
+import IssueCertificate from './pages/IssueCertificate'
 import AdminNotifications from './pages/AdminNotifications'
 import { isAuthenticated, setToken, clearToken, api } from './api'
 
@@ -27,6 +28,7 @@ const pages = {
   evaluation: { component: EvaluationResult, label: 'Evaluation & Result' },
   'task-management': { component: TaskManagement, label: 'Task Management' },
   progress: { component: ViewProgress, label: 'View Progress' },
+  'issue-certificate': { component: IssueCertificate, label: 'Issue Certificate' },
   notifications: { component: AdminNotifications, label: 'Notifications' },
 }
 
