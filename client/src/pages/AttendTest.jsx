@@ -9,6 +9,7 @@ export default function AttendTest() {
   const [activeTech, setActiveTech] = useState('')
   const [loading, setLoading] = useState(true)
   const [alert, setAlert] = useState({ type: 'error', message: '' })
+  const [confirmTest, setConfirmTest] = useState(null)
 
   useEffect(() => {
     fetchTests()
@@ -31,8 +32,10 @@ export default function AttendTest() {
     }
   }
 
-  const handleStartTest = (assessment) => {
-    if (!assessment.isUnlocked || !assessment.isAssignedByAdmin || assessment.hasSubmitted) return
+  const handleConfirmStart = () => {
+    if (!confirmTest) return
+    const assessment = confirmTest
+    setConfirmTest(null)
     navigate('/take-test', { state: { test: assessment } })
   }
 
@@ -58,7 +61,7 @@ export default function AttendTest() {
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Attend Test</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Attend your 25-minute tests. Upload all 5 daily notes for each test block to unlock its test.
+            Attend per-question timed tests (20s MCQ · 1m Descriptive). Upload all 5 daily notes for each test block to unlock its test.
           </p>
         </div>
 
@@ -184,13 +187,13 @@ export default function AttendTest() {
                         {/* Test Spec Badges */}
                         <div className="flex items-center gap-1.5 text-xs text-gray-600 flex-wrap py-1">
                           <span className="px-2 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold text-[11px]">
-                            5 Objective (10M)
+                            5 Objective (10M · 20s/Q)
                           </span>
                           <span className="px-2 py-0.5 rounded bg-cyan-50 text-cyan-700 font-semibold text-[11px]">
-                            5 Descriptive (25M)
+                            5 Descriptive (25M · 1m/Q)
                           </span>
-                          <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-semibold text-[11px]">
-                            25 Mins
+                          <span className="px-2 py-0.5 rounded bg-orange-50 text-orange-700 font-semibold text-[11px]">
+                            Timed per Question
                           </span>
                         </div>
 
@@ -238,11 +241,11 @@ export default function AttendTest() {
                           </button>
                         ) : isReady ? (
                           <button
-                            onClick={() => handleStartTest(item)}
+                            onClick={() => setConfirmTest(item)}
                             className="w-full py-2.5 px-4 text-xs font-bold rounded-xl bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <span>✍️</span>
-                            Start Test (25 Mins)
+                            Start Test
                           </button>
                         ) : item.isUnlocked && !item.isAssignedByAdmin ? (
                           <button
@@ -267,6 +270,71 @@ export default function AttendTest() {
             </div>
           )}
         </>
+      )}
+
+      {/* Start Test Confirmation Modal */}
+      {confirmTest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 sm:p-7 mx-4 animate-scaleUp space-y-5">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
+                ⚠️
+              </div>
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-orange-600 bg-orange-100 px-2.5 py-0.5 rounded-full inline-block">
+                  {confirmTest.technology} · Assessment {confirmTest.assessmentNumber}
+                </span>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Start {confirmTest.testName || 'Assessment'}?
+                </h3>
+              </div>
+            </div>
+
+            {/* Warning Callout Box */}
+            <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2.5 text-xs text-amber-950">
+              <p className="font-bold text-amber-900 flex items-center gap-1.5 text-sm">
+                <span>🔒</span>
+                <span>Important Assessment Rules:</span>
+              </p>
+              <ul className="space-y-2 list-disc list-inside leading-relaxed text-amber-900/90 font-medium">
+                <li>
+                  <strong className="text-red-700">No Exiting:</strong> Once the assessment begins, you <strong>cannot exit, pause, or reload</strong> until all 10 questions are completed.
+                </li>
+                <li>
+                  <strong className="text-gray-900">Sequential Navigation:</strong> Questions appear one by one. You cannot go back to previous questions.
+                </li>
+                <li>
+                  <strong className="text-gray-900">Strict Timers:</strong> 20 seconds for each Objective question and 1 minute for each Descriptive question.
+                </li>
+                <li>
+                  <strong className="text-gray-900">Auto-Progression:</strong> If a timer expires, the question automatically advances to the next.
+                </li>
+              </ul>
+            </div>
+
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Please ensure you have a stable internet connection and are ready to complete the test in one sitting.
+            </p>
+
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmTest(null)}
+                className="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmStart}
+                className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-md shadow-orange-200 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>I Understand, Start Assessment</span>
+                <span>→</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -37,7 +37,7 @@ export default function Profile({ user, onLogout }) {
     { label: 'Email Address', value: data.email },
     { label: 'Enrolled Tracks', value: data.technologies?.join(', ') || '—' },
     { label: 'Account Status', value: data.status },
-    { label: 'Approved Daily Notes', value: `${data.totalApprovedNotes ?? data.totalUploadedNotes}/${data.totalRequiredDays} Days` },
+    { label: 'Approved Daily Notes', value: data.totalRequiredDays > 0 ? `${data.totalApprovedNotes ?? data.totalUploadedNotes}/${data.totalRequiredDays} Days` : `${data.totalApprovedNotes ?? data.totalUploadedNotes} Days` },
     { label: 'Learning Progress', value: `${data.overallProgress}%` },
     { label: 'Pending Practical Tasks', value: data.tasksDue || 0 },
     { label: 'Assessments Completed', value: `${data.totalCompletedTests} of ${data.totalTests}` },

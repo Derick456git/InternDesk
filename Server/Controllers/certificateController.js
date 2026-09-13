@@ -138,6 +138,7 @@ exports.getCompletedInterns = async (req, res) => {
           issueDate: certificate?.issueDate || null,
           issuedFromDate: certificate?.fromDate || null,
           issuedToDate: certificate?.toDate || null,
+          issuedPerformance: certificate?.performance || 'Good',
         })
       }
     }
@@ -369,6 +370,7 @@ exports.getInternSummary = async (req, res) => {
           fromDate: certificate.fromDate,
           toDate: certificate.toDate,
           issueDate: certificate.issueDate,
+          performance: certificate.performance || 'Good',
           status: certificate.status,
           issuedAt: certificate.createdAt,
         } : null,
@@ -386,7 +388,7 @@ exports.getInternSummary = async (req, res) => {
  */
 exports.issueCertificate = async (req, res) => {
   try {
-    const { internId, internName, email, technology, fromDate, toDate, issueDate, meta } = req.body
+    const { internId, internName, email, technology, fromDate, toDate, issueDate, performance, meta } = req.body
 
     if (!internName || !internName.trim()) {
       return res.status(400).json({ success: false, message: 'Intern name is required' })
@@ -400,6 +402,7 @@ exports.issueCertificate = async (req, res) => {
 
     const trimmedEmail = (email || '').toLowerCase().trim()
     const trimmedTech = technology.trim()
+    const perfRating = performance || meta?.performance || 'Good'
 
     // Find existing certificate or create a new one
     let certificate = await Certificate.findOne({
@@ -412,9 +415,10 @@ exports.issueCertificate = async (req, res) => {
       certificate.fromDate = fromDate
       certificate.toDate = toDate
       certificate.issueDate = issueDate
+      certificate.performance = perfRating
       certificate.status = 'Issued'
       certificate.issuedBy = 'Admin'
-      if (meta) certificate.meta = { ...certificate.meta, ...meta }
+      if (meta) certificate.meta = { ...certificate.meta, ...meta, performance: perfRating }
       await certificate.save()
     } else {
       certificate = await Certificate.create({
@@ -425,9 +429,10 @@ exports.issueCertificate = async (req, res) => {
         fromDate,
         toDate,
         issueDate,
+        performance: perfRating,
         status: 'Issued',
         issuedBy: 'Admin',
-        meta: meta || {},
+        meta: { ...(meta || {}), performance: perfRating },
       })
     }
 

@@ -84,20 +84,22 @@ exports.createDailyNote = async (req, res) => {
       technology,
       dayNumber: day,
     })
-    if (existingSubmission) {
+    const isReupload = existingSubmission && existingSubmission.status === 'Rejected'
+
+    if (existingSubmission && !isReupload) {
       return res.status(400).json({
         success: false,
-        message: `You have already submitted notes for Day ${day}.`,
+        message: `You have already submitted notes for Day ${day}. Status: ${existingSubmission.status}.`,
       })
     }
 
     // Sequential day check: Intern must upload notes sequentially (Day 1, Day 2, ..., Day N)
-    if (day > 1) {
+    if (day > 1 && !isReupload) {
       const existingDays = await DailyNote.find({
         internId: registration._id,
         technology,
         dayNumber: { $gte: 1, $lt: day },
-      }).select('dayNumber').lean()
+      }).select('dayNumber status').lean()
 
       const submittedDaySet = new Set(existingDays.map((d) => d.dayNumber))
       for (let p = 1; p < day; p++) {
@@ -112,7 +114,7 @@ exports.createDailyNote = async (req, res) => {
 
     // Test validation: Intern must attend & submit Test m before uploading Day > 5*m
     const prevTest = Math.floor((day - 1) / 5)
-    if (prevTest >= 1) {
+    if (prevTest >= 1 && !isReupload) {
       for (let m = 1; m <= prevTest; m++) {
         const startDay = (m - 1) * 5 + 1
         const endDay = m * 5
@@ -192,6 +194,7 @@ exports.createDailyNote = async (req, res) => {
         submissionDate: new Date(),
         status: 'Pending',
         reviewStatus: 'Pending',
+        feedbackMark: 'Pending',
       },
       { upsert: true, new: true }
     )
@@ -203,11 +206,15 @@ exports.createDailyNote = async (req, res) => {
         internName: registration.name,
         internEmail: registration.email,
         technology,
-        title: `Daily Notes: ${registration.name} (${technology} Day ${day})`,
-        message: `${registration.name} submitted Day ${day} Notes & Book for ${technology}.`,
+        title: isReupload
+          ? `Daily Notes Re-uploaded: ${registration.name} (${technology} Day ${day})`
+          : `Daily Notes: ${registration.name} (${technology} Day ${day})`,
+        message: isReupload
+          ? `${registration.name} re-uploaded revised Day ${day} Notes & Book for ${technology}.`
+          : `${registration.name} submitted Day ${day} Notes & Book for ${technology}.`,
         type: 'note_submitted',
         referenceId: submission._id,
-        meta: { dayNumber: day, technology, internId: registration._id, submissionId: submission._id },
+        meta: { dayNumber: day, technology, internId: registration._id, submissionId: submission._id, isReupload: Boolean(isReupload) },
       })
     } catch (notifErr) {
       console.error('Failed to create admin note notification:', notifErr.message)
@@ -227,7 +234,9 @@ exports.createDailyNote = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Daily notes and book uploaded successfully to Cloudinary.',
+      message: isReupload
+        ? 'Daily notes & book re-uploaded successfully for admin review.'
+        : 'Daily notes and book uploaded successfully to Cloudinary.',
       data: submission,
     })
   } catch (error) {
@@ -356,10 +365,10 @@ exports.giveFeedback = async (req, res) => {
 
     const numericScore = Number(score)
     if (score === undefined || score === null || score === '') {
-      return res.status(400).json({ success: false, message: 'Please enter a score for the submission.' })
+      return res.status(400).json({ success: false, message: 'Please enter a mark (0-10) for the submission.' })
     }
     if (!Number.isInteger(numericScore) || numericScore < 0 || numericScore > 10) {
-      return res.status(400).json({ success: false, message: 'Score must be an integer between 0 and 10.' })
+      return res.status(400).json({ success: false, message: 'Mark must be an integer between 0 and 10.' })
     }
 
     const submission = await DailyNote.findById(id)
@@ -367,12 +376,14 @@ exports.giveFeedback = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Submission not found.' })
     }
 
-    const finalStatus = status || (numericScore >= 5 ? 'Approved' : 'Rejected')
+    const finalStatus = status && ['Approved', 'Rejected'].includes(status)
+      ? status
+      : (numericScore >= 5 ? 'Approved' : 'Rejected')
 
     submission.feedbackMark = `${numericScore}/10`
-    submission.reviewStatus = 'Completed'
+    submission.reviewStatus = finalStatus === 'Approved' ? 'Completed' : 'Rejected'
     submission.status = finalStatus
-    if (feedback) submission.adminFeedback = feedback
+    submission.adminFeedback = (feedback || '').trim()
     await submission.save()
 
     const registration = await Registration.findById(submission.internId)
@@ -384,7 +395,7 @@ exports.giveFeedback = async (req, res) => {
           dayNumber: submission.dayNumber,
           status: finalStatus,
           score: numericScore,
-          feedback: feedback || submission.adminFeedback,
+          feedback: submission.adminFeedback,
         })
       } catch (emailError) {
         console.error('Daily notes feedback email failed:', emailError.message)
@@ -395,8 +406,8 @@ exports.giveFeedback = async (req, res) => {
           recipientId: registration._id,
           email: registration.email,
           internName: registration.name,
-          title: `Day ${submission.dayNumber} Notes Reviewed`,
-          message: `Your Day ${submission.dayNumber} notes for ${submission.technology} were reviewed: ${numericScore}/10 (${finalStatus}).`,
+          title: `Day ${submission.dayNumber} Notes ${finalStatus === 'Approved' ? 'Approved' : 'Revision Required'}`,
+          message: `Your Day ${submission.dayNumber} notes for ${submission.technology} were reviewed: ${numericScore}/10 (${finalStatus}).${submission.adminFeedback ? ` Feedback: "${submission.adminFeedback}"` : ''}`,
           type: 'note_reviewed',
         })
       } catch (notifErr) {
@@ -406,7 +417,7 @@ exports.giveFeedback = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Feedback of ${numericScore}/10 saved and note marked as ${finalStatus}.`,
+      message: `Feedback of ${numericScore}/10 (${finalStatus}) with written remarks sent successfully.`,
       data: submission,
     })
   } catch (error) {

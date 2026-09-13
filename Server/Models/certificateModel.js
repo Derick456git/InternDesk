@@ -8,6 +8,7 @@ const certificateSchema = new mongoose.Schema({
   fromDate: { type: String, required: true },
   toDate: { type: String, required: true },
   issueDate: { type: String, required: true },
+  performance: { type: String, enum: ['Better', 'Good', 'Bad', 'Excellent'], default: 'Good' },
   certificateNumber: { type: String, unique: true, sparse: true },
   status: { type: String, enum: ['Issued', 'Revoked'], default: 'Issued' },
   issuedBy: { type: String, default: 'Admin' },
@@ -15,6 +16,7 @@ const certificateSchema = new mongoose.Schema({
     durationDays: { type: Number, default: 0 },
     syllabusName: { type: String, default: '' },
     finalScore: { type: Number, default: 0 },
+    performance: { type: String, default: 'Good' },
   },
 }, { timestamps: true })
 

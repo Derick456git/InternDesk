@@ -100,32 +100,59 @@ exports.sendSyllabusAssignmentEmail = async (to, { internName, syllabusName, tec
 
 exports.sendDailyNotesFeedbackEmail = async (to, { internName, technology, dayNumber, status, score, feedback }) => {
   const isApproved = status === 'Approved'
-  const subject = `Daily Notes ${status || 'Reviewed'} – ${technology} Day ${dayNumber}`
+  const subject = isApproved
+    ? `Daily Notes Approved (${score ? `${score}/10` : 'Approved'}) – ${technology} Day ${dayNumber}`
+    : `Daily Notes Feedback & Re-upload Required – ${technology} Day ${dayNumber}`
   const accentColor = isApproved ? '#16a34a' : '#dc2626'
+  const statusLabel = isApproved ? 'Approved' : 'Revision / Re-upload Required'
   const loginUrl = getInternLoginUrl()
 
   const mailOptions = {
     from: `"Intern Desk Admin" <${process.env.EMAIL_USER}>`,
     to,
     subject,
-    text: `Dear ${internName},\n\nYour Day ${dayNumber} notes for ${technology} have been ${status}.\n${score ? `Score: ${score}/10\n` : ''}${feedback ? `Feedback: ${feedback}\n` : ''}\nLogin to Intern Portal: ${loginUrl}\n\nPlease check your Intern Portal for details.`,
+    text: `Dear ${internName},\n\nYour Day ${dayNumber} daily notes for ${technology} have been evaluated by the admin.\n\nEvaluation Result: ${statusLabel}\n${score !== undefined && score !== null ? `Marks Awarded: ${score}/10\n` : ''}${feedback ? `Admin Written Feedback: ${feedback}\n` : ''}\n${!isApproved ? 'ACTION REQUIRED: Please review the admin feedback, make necessary corrections, and re-upload your notes & book on the Intern Portal.\n\n' : ''}Login to Intern Portal: ${loginUrl}\n\n- Intern Desk Team`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto;">
-        <div style="background-color: #0f1a2e; padding: 20px; text-align: center;">
+      <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto;">
+        <div style="background-color: #0f1a2e; padding: 22px; text-align: center;">
           <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Intern Desk</h1>
-          <p style="color: #8899aa; margin: 4px 0 0; font-size: 12px;">Daily Notes Review</p>
+          <p style="color: #8899aa; margin: 4px 0 0; font-size: 12px;">Daily Notes Evaluation & Feedback</p>
         </div>
         <div style="padding: 24px; background-color: #ffffff; border: 1px solid #e5e7eb;">
           <h2 style="margin: 0 0 12px; font-size: 16px; color: #1f2937;">${subject}</h2>
-          <p style="font-size: 14px; color: #4b5563; margin: 0 0 14px;">Dear ${internName},</p>
-          <p style="font-size: 14px; color: #4b5563; margin: 0 0 14px;">Your <strong>Day ${dayNumber}</strong> notes for <strong>${technology}</strong> have been reviewed by the admin.</p>
-          <div style="padding: 16px; background-color: #f3f4f6; border-radius: 8px; border-left: 4px solid ${accentColor}; margin-bottom: 14px;">
-            <p style="margin: 0; font-size: 16px; font-weight: 700; color: ${accentColor};">Status: ${status}</p>
-            ${score !== undefined && score !== null ? `<p style="margin: 6px 0 0; font-size: 14px; color: #1f2937;">Score: <strong>${score}/10</strong></p>` : ''}
-            ${feedback ? `<p style="margin: 6px 0 0; font-size: 13px; color: #4b5563;">Feedback: ${feedback}</p>` : ''}
+          <p style="font-size: 14px; color: #4b5563; margin: 0 0 14px;">Dear <strong>${internName}</strong>,</p>
+          <p style="font-size: 14px; color: #4b5563; margin: 0 0 14px;">Your <strong>Day ${dayNumber}</strong> notes & book for <strong>${technology}</strong> have been reviewed by the administrator.</p>
+          
+          <div style="padding: 16px; background-color: #f9fafb; border-radius: 8px; border-left: 4px solid ${accentColor}; margin-bottom: 16px;">
+            <p style="margin: 0; font-size: 15px; font-weight: 700; color: ${accentColor};">
+              Status: ${statusLabel}
+            </p>
+            ${score !== undefined && score !== null ? `
+              <p style="margin: 8px 0 0; font-size: 14px; color: #1f2937;">
+                Score / Marks: <strong style="color: #ea580c; font-size: 16px;">${score}/10</strong>
+              </p>
+            ` : ''}
+            ${feedback ? `
+              <div style="margin-top: 10px; padding: 10px 12px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 6px;">
+                <p style="margin: 0; font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase;">Admin Written Feedback:</p>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #374151; line-height: 1.5; font-style: italic;">
+                  "${feedback}"
+                </p>
+              </div>
+            ` : ''}
           </div>
+
+          ${!isApproved ? `
+            <div style="padding: 12px 14px; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin-bottom: 16px;">
+              <p style="margin: 0; font-size: 13px; font-weight: 700; color: #b91c1c;">⚠️ Action Required: Re-upload Notes</p>
+              <p style="margin: 4px 0 0; font-size: 12px; color: #7f1d1d;">
+                Please incorporate the admin's feedback, update your note (.docx) and book (.xlsx), and re-upload them in the 'Upload Notes' section of your Intern Portal.
+              </p>
+            </div>
+          ` : ''}
+
           ${renderInternLoginButtonHtml('Login to Intern Portal →')}
-          <p style="font-size: 13px; color: #4b5563; margin: 10px 0 0; text-align: center;">Log in to your Intern Portal to check your progress.</p>
+          <p style="font-size: 12px; color: #6b7280; margin: 12px 0 0; text-align: center;">Log in to your Intern Portal to check all feedback and submissions.</p>
         </div>
         <div style="padding: 16px; text-align: center; background-color: #f9fafb; border: 1px solid #e5e7eb; border-top: none;">
           <p style="font-size: 11px; color: #9ca3af; margin: 0;">&copy; ${new Date().getFullYear()} Intern Desk. All rights reserved.</p>

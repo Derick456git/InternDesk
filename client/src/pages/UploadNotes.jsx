@@ -85,7 +85,12 @@ export default function UploadNotes({ onNavigate }) {
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 6
 
-  const submissionKeys = new Set(submissions.map((s) => s.technology + '-' + s.dayNumber))
+  const validApprovedOrPendingKeys = new Set(
+    submissions.filter((s) => s.status !== 'Rejected').map((s) => s.technology + '-' + s.dayNumber)
+  )
+  const rejectedKeys = new Set(
+    submissions.filter((s) => s.status === 'Rejected').map((s) => s.technology + '-' + s.dayNumber)
+  )
 
   useEffect(() => {
     fetchData()
@@ -135,6 +140,29 @@ export default function UploadNotes({ onNavigate }) {
     setTechnology(tech)
     setDayNumber('')
     setEligibilityAlert(null)
+  }
+
+  const handleStartReupload = (sub) => {
+    setTechnology(sub.technology)
+    setDayNumber(String(sub.dayNumber))
+    setNoteFile(null)
+    setBookFile(null)
+    const e1 = document.getElementById('note-input')
+    const e2 = document.getElementById('book-input')
+    if (e1) e1.value = ''
+    if (e2) e2.value = ''
+    setAlert({
+      type: 'info',
+      message: `Re-uploading Day ${sub.dayNumber} notes for ${sub.technology}: Please attach your revised Note (.docx) and Book (.xlsx) files above and submit.`,
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const resolveFileUrl = (url) => {
+    if (!url) return '#'
+    if (url.startsWith('http://') || url.startsWith('https://')) return url
+    const serverBase = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '')
+    return `${serverBase}/${url.replace(/\\/g, '/')}`
   }
 
   // Check sequential notes requirement: all days 1 .. day-1 must be submitted
@@ -272,28 +300,31 @@ export default function UploadNotes({ onNavigate }) {
     if (!technology) return setAlert({ type: 'error', message: 'Please select a technology.' })
     if (!dayNumber) return setAlert({ type: 'error', message: 'Please select a day.' })
 
-    const futureStatus = getFutureDayStatus(selectedAssignment, dayNumber)
-    if (futureStatus.isFuture) {
-      return setAlert({
-        type: 'error',
-        message: futureStatus.reason || `Day ${dayNumber} notes cannot be uploaded before its scheduled date.`,
-      })
-    }
+    const isRejected = rejectedKeys.has(technology + '-' + dayNumber)
+    if (!isRejected) {
+      const futureStatus = getFutureDayStatus(selectedAssignment, dayNumber)
+      if (futureStatus.isFuture) {
+        return setAlert({
+          type: 'error',
+          message: futureStatus.reason || `Day ${dayNumber} notes cannot be uploaded before its scheduled date.`,
+        })
+      }
 
-    const seqStatus = getSequentialDayStatus(technology, dayNumber)
-    if (seqStatus.isLocked) {
-      return setAlert({
-        type: 'error',
-        message: seqStatus.reason || `Please upload Day ${seqStatus.missingDay} notes first.`,
-      })
-    }
+      const seqStatus = getSequentialDayStatus(technology, dayNumber)
+      if (seqStatus.isLocked) {
+        return setAlert({
+          type: 'error',
+          message: seqStatus.reason || `Please upload Day ${seqStatus.missingDay} notes first.`,
+        })
+      }
 
-    const lockStatus = getDayLockStatus(technology, dayNumber)
-    if (lockStatus.isLocked) {
-      return setAlert({
-        type: 'error',
-        message: lockStatus.reason || `You must attend and submit Test ${lockStatus.blockedByTest} in 'Attend Test'`,
-      })
+      const lockStatus = getDayLockStatus(technology, dayNumber)
+      if (lockStatus.isLocked) {
+        return setAlert({
+          type: 'error',
+          message: lockStatus.reason || `You must attend and submit Test ${lockStatus.blockedByTest} in 'Attend Test'`,
+        })
+      }
     }
 
     if (!noteFile || !bookFile) {
@@ -513,14 +544,15 @@ export default function UploadNotes({ onNavigate }) {
                 >
                   <option value="">{dayOptions.length === 0 ? (technology ? 'No days available' : 'Select technology first') : 'Select Day'}</option>
                   {dayOptions.map((day) => {
-                    const isAlreadySubmitted = submissionKeys.has(technology + '-' + day)
+                    const isRejected = rejectedKeys.has(technology + '-' + day)
+                    const isAlreadySubmitted = validApprovedOrPendingKeys.has(technology + '-' + day)
                     const seqStatus = getSequentialDayStatus(technology, day)
                     const lockStatus = getDayLockStatus(technology, day)
                     const futureStatus = getFutureDayStatus(selectedAssignment, day)
                     const scheduledDate = futureStatus.scheduledDate || getWorkingDateForDay(selectedAssignment?.startDate, day)
                     const formattedDayDate = scheduledDate ? formatDateWithDay(scheduledDate) : ''
 
-                    const isLocked = isAlreadySubmitted || futureStatus.isFuture || seqStatus.isLocked || lockStatus.isLocked
+                    const isLocked = !isRejected && (isAlreadySubmitted || futureStatus.isFuture || seqStatus.isLocked || lockStatus.isLocked)
 
                     return (
                       <option
@@ -529,7 +561,9 @@ export default function UploadNotes({ onNavigate }) {
                         disabled={isLocked}
                       >
                         Day {day} {formattedDayDate ? `· ${formattedDayDate}` : ''}
-                        {isAlreadySubmitted
+                        {isRejected
+                          ? ' (⚠️ Revision Required - Click to Re-upload)'
+                          : isAlreadySubmitted
                           ? ' (Submitted)'
                           : futureStatus.isFuture
                           ? ` (Locked - Unlocks on ${formattedDayDate})`
@@ -664,36 +698,103 @@ export default function UploadNotes({ onNavigate }) {
         ) : (
           <>
             <div className="overflow-x-auto min-w-0">
-              <table className="w-full min-w-[550px] text-sm">
+              <table className="w-full min-w-[700px] text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     <th className="text-left px-6 py-3">Technology</th>
                     <th className="text-left px-6 py-3">Day</th>
-                    <th className="text-left px-6 py-3">Notes</th>
-                    <th className="text-left px-6 py-3">Book</th>
-                    <th className="text-left px-6 py-3">Feedback / Mark</th>
+                    <th className="text-left px-6 py-3">Notes (.docx)</th>
+                    <th className="text-left px-6 py-3">Book (.xlsx)</th>
+                    <th className="text-left px-6 py-3">Feedback Mark</th>
+                    <th className="text-left px-6 py-3">Admin Remarks</th>
+                    <th className="text-left px-6 py-3">Status</th>
+                    <th className="text-center px-6 py-3">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {paginatedSubmissions.map((sub) => (
-                    <tr key={sub._id} className="hover:bg-orange-50/50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-gray-800">{sub.technology}</td>
-                      <td className="px-6 py-4 text-gray-600 font-semibold">Day {sub.dayNumber}</td>
-                      <td className="px-6 py-4 text-green-600 font-medium">Uploaded Successfully</td>
-                      <td className="px-6 py-4 text-green-600 font-medium">Uploaded Successfully</td>
-                      <td className="px-6 py-4">
-                        {sub.feedbackMark && sub.feedbackMark !== 'Pending' ? (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                            {sub.feedbackMark}
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                            Pending
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {paginatedSubmissions.map((sub) => {
+                    const isApproved = sub.status === 'Approved'
+                    const isRejected = sub.status === 'Rejected'
+                    const isReviewed = Boolean(sub.feedbackMark && sub.feedbackMark !== 'Pending')
+
+                    return (
+                      <tr key={sub._id} className="hover:bg-orange-50/50 transition-colors">
+                        <td className="px-6 py-4 font-medium text-gray-800">{sub.technology}</td>
+                        <td className="px-6 py-4 text-gray-600 font-semibold">Day {sub.dayNumber}</td>
+                        <td className="px-6 py-4">
+                          <a
+                            href={resolveFileUrl(sub.noteFileUrl || sub.noteFilePath)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 underline"
+                          >
+                            📄 View Note
+                          </a>
+                        </td>
+                        <td className="px-6 py-4">
+                          <a
+                            href={resolveFileUrl(sub.bookFileUrl || sub.bookFilePath)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-bold text-green-600 hover:text-green-800 underline"
+                          >
+                            📊 View Book
+                          </a>
+                        </td>
+                        <td className="px-6 py-4">
+                          {isReviewed ? (
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold ${
+                              isApproved ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            }`}>
+                              {sub.feedbackMark}
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                              Pending Review
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 max-w-[220px]">
+                          {sub.adminFeedback ? (
+                            <p className="text-xs text-gray-700 italic line-clamp-2" title={sub.adminFeedback}>
+                              "{sub.adminFeedback}"
+                            </p>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {isApproved ? (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
+                              Approved
+                            </span>
+                          ) : isRejected ? (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                              Revision Required
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                              Under Review
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {isRejected ? (
+                            <button
+                              type="button"
+                              onClick={() => handleStartReupload(sub)}
+                              className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap mx-auto"
+                            >
+                              <span>🔄</span>
+                              Re-upload
+                            </button>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

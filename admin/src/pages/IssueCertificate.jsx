@@ -28,6 +28,7 @@ export default function IssueCertificate({ onNavigate }) {
     fromDate: '',
     toDate: '',
     issueDate: '',
+    performance: 'Good',
   })
   const [savingCert, setSavingCert] = useState(false)
   const canvasRef = useRef(null)
@@ -173,7 +174,69 @@ export default function IssueCertificate({ onNavigate }) {
         ctx.fillText(toText, 565, 482)
       }
 
-      // 4. Date of Issue (Centered above "DATE OF ISSUE" line at bottom-left)
+      // 4. Dynamic Performance Matter (Middle Area: replacing static paragraph)
+      const performance = certForm.performance || 'Good'
+
+      // Cleanly clear the static template paragraph area with crisp white fill
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(45, 506, 634, 218)
+
+      // A. Performance Rating Badge / Title Line
+      let perfTitle = 'Overall Performance: Good'
+      let perfColor = '#0f2b5c' // Navy
+
+      if (performance === 'Better') {
+        perfTitle = 'Overall Performance: Better'
+        perfColor = '#15803d' // Forest Green
+      } else if (performance === 'Bad') {
+        perfTitle = 'Overall Performance: Bad'
+        perfColor = '#b91c1c' // Crimson
+      } else if (performance === 'Excellent') {
+        perfTitle = 'Overall Performance: Excellent'
+        perfColor = '#7e22ce' // Purple
+      }
+
+      ctx.fillStyle = perfColor
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'alphabetic'
+      ctx.font = 'bold 14px "Segoe UI", "Helvetica Neue", Arial, sans-serif'
+      ctx.fillText(perfTitle, centerX, 532)
+
+      // B. Dynamic Certificate Body Paragraphs based on Performance
+      ctx.fillStyle = '#334155'
+      ctx.font = '13px "Segoe UI", "Helvetica Neue", Arial, sans-serif'
+
+      if (performance === 'Better') {
+        // Paragraph 1
+        ctx.fillText('During this period, the intern has demonstrated exceptional dedication, a strong willingness', centerX, 558)
+        ctx.fillText('to learn, and a commendable understanding of concepts and practical implementation in the program.', centerX, 576)
+        // Paragraph 2
+        ctx.fillText('The intern has also successfully completed all assigned tasks and project assessments with high quality.', centerX, 608)
+        // Paragraph 3
+        ctx.fillText('We appreciate their hard work, commitment, and enthusiasm throughout the internship period', centerX, 640)
+        ctx.fillText('and wish them all the best for their future endeavors.', centerX, 658)
+      } else if (performance === 'Bad') {
+        // Paragraph 1
+        ctx.fillText('During this period, the intern has attended the curriculum sessions but demonstrated', centerX, 558)
+        ctx.fillText('below-expected performance in assessments and assigned tasks, requiring further development.', centerX, 576)
+        // Paragraph 2
+        ctx.fillText('The intern is advised to practice core technical concepts and strengthen practical implementation skills.', centerX, 608)
+        // Paragraph 3
+        ctx.fillText('We acknowledge their participation in the program and encourage continuous improvement', centerX, 640)
+        ctx.fillText('for their future endeavors.', centerX, 658)
+      } else {
+        // Default / Good
+        // Paragraph 1
+        ctx.fillText('During this period, the intern has demonstrated dedication, a strong willingness to learn,', centerX, 558)
+        ctx.fillText('and a good understanding of the concepts and practical implementation related to the technologies.', centerX, 576)
+        // Paragraph 2
+        ctx.fillText('The intern has also successfully completed the assigned practical project tasks.', centerX, 608)
+        // Paragraph 3
+        ctx.fillText('We appreciate their hard work, commitment, and enthusiasm throughout the internship period', centerX, 640)
+        ctx.fillText('and wish them all the best for their future endeavors.', centerX, 658)
+      }
+
+      // 5. Date of Issue (Centered above "DATE OF ISSUE" line at bottom-left)
       const issueText = formatDateDisplay(certForm.issueDate)
       if (issueText) {
         ctx.fillStyle = '#0f172a'
@@ -225,6 +288,7 @@ export default function IssueCertificate({ onNavigate }) {
       fromDate: from,
       toDate: to,
       issueDate: issue,
+      performance: intern.issuedPerformance || 'Good',
     })
     setIssueModalOpen(true)
   }
@@ -256,7 +320,7 @@ export default function IssueCertificate({ onNavigate }) {
 
     setSavingCert(true)
     try {
-      // 1. Save certificate record to backend DB
+      // 1. Save certificate record to backend DB with selected performance rating
       const res = await api.post('/certificates/issue', {
         internId: selectedInternForCert?.internId || null,
         internName: certForm.internName,
@@ -265,10 +329,12 @@ export default function IssueCertificate({ onNavigate }) {
         fromDate: certForm.fromDate,
         toDate: certForm.toDate,
         issueDate: certForm.issueDate,
+        performance: certForm.performance || 'Good',
         meta: {
           durationDays: selectedInternForCert?.durationDays || 30,
           syllabusName: selectedInternForCert?.syllabusName || '',
           finalScore: selectedInternForCert?.finalScore || 0,
+          performance: certForm.performance || 'Good',
         },
       })
 
@@ -486,7 +552,7 @@ export default function IssueCertificate({ onNavigate }) {
                           {intern.isIssued ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200/50">
                               <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                              Issued
+                              Issued ({intern.issuedPerformance || 'Good'})
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-200/50">
@@ -810,8 +876,9 @@ export default function IssueCertificate({ onNavigate }) {
                       <div className="font-bold text-green-800 flex items-center gap-1.5">
                         <span>🏆</span> Certificate Already Issued
                       </div>
-                      <div className="text-green-700 grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                      <div className="text-green-700 grid grid-cols-1 sm:grid-cols-4 gap-2 pt-1">
                         <div>Cert No: <strong>{selectedInternSummary.certificate.certificateNumber}</strong></div>
+                        <div>Performance: <strong>{selectedInternSummary.certificate.performance || 'Good'}</strong></div>
                         <div>Duration: <strong>{selectedInternSummary.certificate.fromDate} to {selectedInternSummary.certificate.toDate}</strong></div>
                         <div>Date of Issue: <strong>{selectedInternSummary.certificate.issueDate}</strong></div>
                       </div>
@@ -868,7 +935,7 @@ export default function IssueCertificate({ onNavigate }) {
                 <div>
                   <h3 className="font-bold text-lg">Issue Internship Certificate</h3>
                   <p className="text-xs text-blue-200">
-                    Fill the certificate details and download the official signed certificate
+                    Configure dynamic performance feedback, dates, and download the official certificate
                   </p>
                 </div>
               </div>
@@ -885,13 +952,13 @@ export default function IssueCertificate({ onNavigate }) {
               {/* Left Side: Form Inputs */}
               <div className="lg:col-span-6 space-y-4">
                 <div className="p-3 bg-orange-50/60 border border-orange-100 rounded-xl text-xs text-orange-900 leading-relaxed">
-                  <strong>ℹ️ Auto-Fill Notice:</strong> The Intern Name and Technology are fixed based on course completion records. You can select the Duration Dates and Date of Issue via the calendar selectors below.
+                  <strong>ℹ️ Dynamic Settings:</strong> Select the Performance Feedback rating and Duration Dates below. The certificate matter and preview will update automatically in real-time.
                 </div>
 
                 {/* 1. Intern Name (Static / Read-only) */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Name of Intern <span className="text-gray-400 font-normal"></span>
+                    Name of Intern
                   </label>
                   <input
                     type="text"
@@ -905,7 +972,7 @@ export default function IssueCertificate({ onNavigate }) {
                 {/* 2. Name of Technology (Static / Read-only) */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Name of Technology <span className="text-gray-400 font-normal"></span>
+                    Name of Technology
                   </label>
                   <input
                     type="text"
@@ -916,7 +983,27 @@ export default function IssueCertificate({ onNavigate }) {
                   />
                 </div>
 
-                {/* 3. Duration: From Date & To Date (Dynamic Calendar) */}
+                {/* 3. Performance / Feedback Rating (Dynamic Dropdown) */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Performance Feedback * <span className="text-orange-600 font-normal">(Dynamic Certificate Matter)</span>
+                  </label>
+                  <select
+                    value={certForm.performance}
+                    onChange={(e) => setCertForm((prev) => ({ ...prev, performance: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-xs sm:text-sm font-semibold text-gray-800 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition bg-white"
+                  >
+                    <option value="Better">Better (Commendable)</option>
+                    <option value="Good">Good (Satisfactory)</option>
+                    <option value="Bad">Bad (Needs Improvement)</option>
+                    <option value="Excellent">Excellent (Outstanding)</option>
+                  </select>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Matter regarding this performance rating will be dynamically generated on the certificate.
+                  </p>
+                </div>
+
+                {/* 4. Duration: From Date & To Date (Dynamic Calendar) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
@@ -966,7 +1053,7 @@ export default function IssueCertificate({ onNavigate }) {
                   </div>
                 </div>
 
-                {/* 4. Date of Issue (Dynamic Calendar) */}
+                {/* 5. Date of Issue (Dynamic Calendar) */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
                     Date of Issue * <span className="text-orange-500 font-normal">(Today/Future)</span>
@@ -992,6 +1079,7 @@ export default function IssueCertificate({ onNavigate }) {
                   <div className="font-semibold text-gray-700">Previewed Placements:</div>
                   <div>• <strong>Intern Name:</strong> {certForm.internName || '—'}</div>
                   <div>• <strong>Technology:</strong> {certForm.technology || '—'}</div>
+                  <div>• <strong>Performance Rating:</strong> <span className={`font-bold ${certForm.performance === 'Better' || certForm.performance === 'Excellent' ? 'text-green-600' : certForm.performance === 'Bad' ? 'text-red-600' : 'text-blue-600'}`}>{certForm.performance}</span></div>
                   <div>• <strong>Duration:</strong> {formatDateDisplay(certForm.fromDate)} to {formatDateDisplay(certForm.toDate)}</div>
                   <div>• <strong>Issue Date:</strong> {formatDateDisplay(certForm.issueDate)}</div>
                 </div>

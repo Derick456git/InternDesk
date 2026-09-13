@@ -8,8 +8,7 @@ export default function ListDailyNotes() {
   const [nameFilter, setNameFilter] = useState('')
   const [techFilter, setTechFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
-  const [scores, setScores] = useState({})
-  const [confirmModal, setConfirmModal] = useState(null) // { note, score }
+  const [feedbackModal, setFeedbackModal] = useState(null) // { note, score, feedback, status }
   const [submittingFeedback, setSubmittingFeedback] = useState(false)
   const [tableAlert, setTableAlert] = useState({ type: 'error', message: '' })
   const [currentPage, setCurrentPage] = useState(1)
@@ -40,6 +39,8 @@ export default function ListDailyNotes() {
     if (techFilter && n.technology !== techFilter) return false
     const isReviewed = Boolean(n.feedbackMark && n.feedbackMark !== 'Pending')
     if (statusFilter === 'Review Pending' && isReviewed) return false
+    if (statusFilter === 'Approved' && (!isReviewed || n.status !== 'Approved')) return false
+    if (statusFilter === 'Rejected' && (!isReviewed || n.status !== 'Rejected')) return false
     if (statusFilter === 'Feedback Sent' && !isReviewed) return false
     return true
   })
@@ -69,12 +70,46 @@ export default function ListDailyNotes() {
     setCurrentPage(1)
   }
 
-  const handleOpenConfirm = (note) => {
+  const handleOpenFeedbackModal = (note) => {
     setTableAlert({ type: 'error', message: '' })
-    const score = scores[note._id]
+    const existingMark = note.feedbackMark && note.feedbackMark !== 'Pending'
+      ? note.feedbackMark.replace('/10', '').trim()
+      : ''
+    const initialScore = existingMark !== '' ? Number(existingMark) : ''
+    const initialStatus = note.status === 'Rejected' ? 'Rejected' : 'Approved'
+    const initialFeedback = note.adminFeedback || ''
+
+    setFeedbackModal({
+      note,
+      score: initialScore,
+      feedback: initialFeedback,
+      status: initialStatus,
+    })
+  }
+
+  const handleScoreChangeInModal = (val) => {
+    const num = val === '' ? '' : Number(val)
+    setFeedbackModal((prev) => {
+      if (!prev) return prev
+      // Auto-suggest status if not manually changed
+      let autoStatus = prev.status
+      if (num !== '' && !isNaN(num)) {
+        autoStatus = num >= 5 ? 'Approved' : 'Rejected'
+      }
+      return {
+        ...prev,
+        score: val,
+        status: autoStatus,
+      }
+    })
+  }
+
+  const handleConfirmSendFeedback = async () => {
+    if (!feedbackModal?.note) return
+    const { note, score, feedback, status } = feedbackModal
 
     if (score === undefined || score === null || score === '') {
-      setTableAlert({ type: 'error', message: 'Please enter a mark (0-10) before sending feedback.' })
+      setTableAlert({ type: 'error', message: 'Please enter a valid mark (0-10).' })
       return
     }
 
@@ -84,27 +119,23 @@ export default function ListDailyNotes() {
       return
     }
 
-    setConfirmModal({ note, score: numericScore })
-  }
-
-  const handleConfirmSend = async () => {
-    if (!confirmModal?.note) return
-    const { note, score } = confirmModal
     setSubmittingFeedback(true)
 
     try {
       const res = await api.put(`/admin/daily-notes/${note._id}/feedback`, {
-        score,
-        status: 'Approved',
+        score: numericScore,
+        feedback: feedback ? feedback.trim() : '',
+        status: status || (numericScore >= 5 ? 'Approved' : 'Rejected'),
       })
+
       setTableAlert({
         type: 'success',
-        message: res.message || `Feedback mark of ${score}/10 sent for ${note.internName} (Day ${note.dayNumber}). Status changed to Feedback Sent.`,
+        message: res.message || `Feedback mark of ${numericScore}/10 (${status}) with remarks sent for ${note.internName} (Day ${note.dayNumber}). Notification & Email sent to intern.`,
       })
-      setConfirmModal(null)
+      setFeedbackModal(null)
       await fetchNotes()
     } catch (err) {
-      setTableAlert({ type: 'error', message: err.message || 'Unable to send feedback mark.' })
+      setTableAlert({ type: 'error', message: err.message || 'Unable to send feedback.' })
     } finally {
       setSubmittingFeedback(false)
     }
@@ -121,7 +152,9 @@ export default function ListDailyNotes() {
     <div className="space-y-5">
       <div>
         <h2 className="text-2xl font-bold text-gray-800">List Daily Notes</h2>
-        <p className="text-sm text-gray-500 mt-1">Review intern daily notes & book submissions and evaluate with feedback marks.</p>
+        <p className="text-sm text-gray-500 mt-1">
+          Review intern daily notes & book submissions, award marks (0–10), and send detailed written feedback with revision / approval status.
+        </p>
       </div>
 
       <AlertBanner
@@ -169,7 +202,9 @@ export default function ListDailyNotes() {
             >
               <option value="All">All Statuses</option>
               <option value="Review Pending">Review Pending</option>
-              <option value="Feedback Sent">Feedback Sent</option>
+              <option value="Approved">Approved</option>
+              <option value="Rejected">Rejected (Re-upload Required)</option>
+              <option value="Feedback Sent">All Feedback Sent</option>
             </select>
           </div>
         </div>
@@ -183,7 +218,7 @@ export default function ListDailyNotes() {
         ) : (
           <>
             <div className="overflow-x-auto min-w-0">
-              <table className="w-full min-w-[720px] text-sm">
+              <table className="w-full min-w-[850px] text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="text-left px-5 py-3 font-semibold text-gray-600">Intern Name</th>
@@ -191,13 +226,16 @@ export default function ListDailyNotes() {
                     <th className="text-left px-5 py-3 font-semibold text-gray-600">Day</th>
                     <th className="text-left px-5 py-3 font-semibold text-gray-600">Download Notes</th>
                     <th className="text-left px-5 py-3 font-semibold text-gray-600">Download Book</th>
-                    <th className="text-left px-5 py-3 font-semibold text-gray-600">Feedback Mark</th>
+                    <th className="text-left px-5 py-3 font-semibold text-gray-600">Feedback & Mark</th>
                     <th className="text-left px-5 py-3 font-semibold text-gray-600">Status</th>
+                    <th className="text-center px-5 py-3 font-semibold text-gray-600">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {paginatedNotes.map((note) => {
                     const isReviewed = Boolean(note.feedbackMark && note.feedbackMark !== 'Pending')
+                    const isApproved = note.status === 'Approved'
+                    const isRejected = note.status === 'Rejected'
 
                     return (
                       <tr key={note._id} className="hover:bg-orange-50/60 transition-colors">
@@ -216,12 +254,12 @@ export default function ListDailyNotes() {
                             href={resolveFileUrl(note.noteFileUrl || note.noteFilePath)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-lg transition-all shadow-xs cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-lg transition-all shadow-xs cursor-pointer"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            Notes
+                            Notes (.docx)
                           </a>
                         </td>
                         <td className="px-5 py-3">
@@ -229,49 +267,64 @@ export default function ListDailyNotes() {
                             href={resolveFileUrl(note.bookFileUrl || note.bookFilePath)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-green-700 bg-green-100 hover:bg-green-200 rounded-lg transition-all shadow-xs cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-green-700 bg-green-100 hover:bg-green-200 rounded-lg transition-all shadow-xs cursor-pointer"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            Book
+                            Book (.xlsx)
                           </a>
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-5 py-3 max-w-[220px]">
                           {isReviewed ? (
-                            <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
-                              {note.feedbackMark}
-                            </span>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                min="0"
-                                max="10"
-                                placeholder="0-10"
-                                value={scores[note._id] ?? ''}
-                                onChange={(e) => setScores((prev) => ({ ...prev, [note._id]: e.target.value }))}
-                                className="w-20 px-2.5 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-400 outline-none text-center font-bold"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleOpenConfirm(note)}
-                                className="px-4 py-2 text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-lg shadow-sm transition-all cursor-pointer whitespace-nowrap"
-                              >
-                                Send Feedback
-                              </button>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
+                                  isApproved ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {note.feedbackMark}
+                                </span>
+                              </div>
+                              {note.adminFeedback ? (
+                                <p className="text-xs text-gray-600 line-clamp-2 italic" title={note.adminFeedback}>
+                                  "{note.adminFeedback}"
+                                </p>
+                              ) : (
+                                <span className="text-xs text-gray-400">No written remarks</span>
+                              )}
                             </div>
+                          ) : (
+                            <span className="text-xs text-gray-400 font-medium italic">Pending evaluation</span>
                           )}
                         </td>
                         <td className="px-5 py-3">
                           {isReviewed ? (
-                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
-                              Feedback Sent
-                            </span>
+                            isApproved ? (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+                                Approved
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                                Rejected (Re-upload)
+                              </span>
+                            )
                           ) : (
                             <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
                               Review Pending
                             </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          {isReviewed ? (
+                            <span className="text-xs text-gray-400 font-medium">—</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenFeedbackModal(note)}
+                              className="px-3.5 py-1.5 text-xs font-bold rounded-lg shadow-xs transition-all cursor-pointer whitespace-nowrap bg-orange-500 text-white hover:bg-orange-600"
+                            >
+                              📝 Send Feedback
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -330,58 +383,133 @@ export default function ListDailyNotes() {
         )}
       </div>
 
-      {/* Confirmation Modal */}
-      {confirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4 animate-scaleUp space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-lg">
-                📝
+      {/* Enhanced Feedback & Evaluation Modal */}
+      {feedbackModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 mx-4 animate-scaleUp space-y-4 border border-gray-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-lg">
+                  📝
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Evaluate Daily Notes</h3>
+                  <p className="text-xs text-gray-500">
+                    {feedbackModal.note.technology} — Day {feedbackModal.note.dayNumber}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFeedbackModal(null)}
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Intern & Submission Info */}
+            <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-gray-400 font-medium block">Intern Name</span>
+                <strong className="text-gray-800">{feedbackModal.note.internName}</strong>
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Confirm Feedback Submission</h3>
-                <p className="text-xs text-gray-500">
-                  {confirmModal.note.technology} — Day {confirmModal.note.dayNumber}
-                </p>
+                <span className="text-gray-400 font-medium block">Intern Email</span>
+                <span className="text-gray-600 truncate block">{feedbackModal.note.internEmail || '—'}</span>
               </div>
             </div>
 
-            <div className="p-4 bg-orange-50/70 border border-orange-200 rounded-xl space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500 font-medium">Intern:</span>
-                <span className="font-bold text-gray-800">{confirmModal.note.internName}</span>
+            {/* Form Fields: Marks & Status */}
+            <div className="space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Feedback Mark (0 – 10) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    placeholder="Enter mark (0-10)"
+                    value={feedbackModal.score}
+                    onChange={(e) => handleScoreChangeInModal(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-bold text-gray-800 focus:ring-2 focus:ring-orange-400 outline-none"
+                  />
+                  <span className="text-[11px] text-gray-400 mt-0.5 block">Score out of 10 marks</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Evaluation Decision <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-gray-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setFeedbackModal((prev) => ({ ...prev, status: 'Approved' }))}
+                      className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        feedbackModal.status === 'Approved'
+                          ? 'bg-green-600 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      ✓ Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFeedbackModal((prev) => ({ ...prev, status: 'Rejected' }))}
+                      className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        feedbackModal.status === 'Rejected'
+                          ? 'bg-red-600 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      ✗ Reject (Re-upload)
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-gray-400 mt-0.5 block">
+                    {feedbackModal.status === 'Rejected'
+                      ? 'Intern will be asked to re-upload notes'
+                      : 'Intern notes accepted as approved'}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500 font-medium">Email:</span>
-                <span className="text-gray-600">{confirmModal.note.internEmail || '—'}</span>
-              </div>
-              <div className="flex justify-between text-xs pt-1 border-t border-orange-200">
-                <span className="text-gray-700 font-bold">Feedback Mark:</span>
-                <span className="text-sm font-extrabold text-orange-600">{confirmModal.score} / 10</span>
+
+              {/* Written Feedback / Remarks */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Written Feedback & Observations (Sent to Intern)
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="Provide detailed feedback, code review observations, what went well, or specific correction requirements if re-upload is needed..."
+                  value={feedbackModal.feedback}
+                  onChange={(e) => setFeedbackModal((prev) => ({ ...prev, feedback: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-xs text-gray-800 focus:ring-2 focus:ring-orange-400 outline-none leading-relaxed"
+                />
               </div>
             </div>
 
-            <p className="text-xs text-gray-600 leading-relaxed">
-              Are you sure you want to send this mark? Once submitted, the status will automatically change from{' '}
-              <strong className="text-amber-700">Review Pending</strong> to <strong className="text-green-700">Feedback Sent</strong> and an automated notification will be delivered to the intern.
-            </p>
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl text-xs text-gray-700 leading-relaxed">
+              📧 An automated email and in-portal notification with the mark, decision, and written remarks will be delivered directly to <strong>{feedbackModal.note.internName}</strong>.
+            </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setConfirmModal(null)}
+                onClick={() => setFeedbackModal(null)}
                 disabled={submittingFeedback}
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleConfirmSend}
+                onClick={handleConfirmSendFeedback}
                 disabled={submittingFeedback}
-                className="px-5 py-2 text-sm font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-lg shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-5 py-2 text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-md shadow-orange-200 transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer"
               >
-                {submittingFeedback ? 'Sending...' : 'Yes, Send Feedback'}
+                {submittingFeedback ? 'Sending...' : 'Send Feedback'}
               </button>
             </div>
           </div>

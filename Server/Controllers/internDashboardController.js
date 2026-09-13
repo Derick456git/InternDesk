@@ -62,9 +62,13 @@ exports.getDashboard = async (req, res) => {
 
     for (const technology of technologies) {
       const assignment = assignments.find(a => a.technology === technology)
-      let durationDays = 30
+      let durationDays = 0
+      let isAssigned = false
+      let syllabusName = ''
 
       if (assignment) {
+        isAssigned = true
+        syllabusName = assignment.syllabusName || ''
         const syllabus = await Syllabus.findOne({ technology, syllabusName: assignment.syllabusName })
         if (syllabus && syllabus.durationDays) {
           durationDays = syllabus.durationDays
@@ -72,12 +76,9 @@ exports.getDashboard = async (req, res) => {
           const match = String(assignment.syllabusName || '').match(/(\d+)\s*day/i)
           if (match) durationDays = parseInt(match[1], 10)
         }
-      } else {
-        const syllabus = await Syllabus.findOne({ technology }).sort({ durationDays: -1 })
-        if (syllabus && syllabus.durationDays) durationDays = syllabus.durationDays
       }
 
-      const requiredDays = durationDays || 30
+      const requiredDays = durationDays || 0
 
       // Count uploaded daily notes for this technology
       const techNotes = await DailyNote.find({
@@ -98,18 +99,20 @@ exports.getDashboard = async (req, res) => {
       }).lean()
 
       let techPendingAssessments = 0
-      for (let k = 1; k <= techTotalTests; k++) {
-        const startDay = (k - 1) * 5 + 1
-        const endDay = k * 5
-        const mDays = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i)
-        const allNotesUploaded = mDays.every(d => uploadedDayNumbers.includes(d))
+      if (techTotalTests > 0) {
+        for (let k = 1; k <= techTotalTests; k++) {
+          const startDay = (k - 1) * 5 + 1
+          const endDay = k * 5
+          const mDays = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i)
+          const allNotesUploaded = mDays.every(d => uploadedDayNumbers.includes(d))
 
-        const hasSubmitted = techSubmissions.some(
-          ts => ts.assessmentNumber === k || (ts.testName && new RegExp(`Assessment\\s*${k}`, 'i').test(ts.testName))
-        )
+          const hasSubmitted = techSubmissions.some(
+            ts => ts.assessmentNumber === k || (ts.testName && new RegExp(`Assessment\\s*${k}`, 'i').test(ts.testName))
+          )
 
-        if (allNotesUploaded && !hasSubmitted) {
-          techPendingAssessments++
+          if (allNotesUploaded && !hasSubmitted) {
+            techPendingAssessments++
+          }
         }
       }
 
@@ -124,7 +127,7 @@ exports.getDashboard = async (req, res) => {
       let startDateFormatted = ''
       let endDateFormatted = ''
 
-      if (startDate) {
+      if (startDate && requiredDays > 0) {
         endDate = getWorkingEndDate(startDate, requiredDays)
         startDateFormatted = formatDateGB(startDate)
         endDateFormatted = formatDateGB(endDate)
@@ -132,6 +135,8 @@ exports.getDashboard = async (req, res) => {
 
       technologyCards.push({
         technology,
+        isAssigned,
+        hasAssignedSyllabus: isAssigned,
         requiredDays,
         uploadedNotes: uploadedNotesCount,
         approvedNotes: uploadedNotesCount,
@@ -143,7 +148,7 @@ exports.getDashboard = async (req, res) => {
         endDate,
         startDateFormatted,
         endDateFormatted,
-        syllabusName: assignment?.syllabusName || '',
+        syllabusName,
       })
     }
 
@@ -175,6 +180,7 @@ exports.getDashboard = async (req, res) => {
         email: intern?.email || registration?.email || email,
         status,
         statusMessage,
+        hasAssignedSyllabus: assignments.length > 0 && totalRequiredDays > 0,
         technologies,
         technologyCards,
         overallProgress,

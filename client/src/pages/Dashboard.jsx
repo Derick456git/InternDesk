@@ -30,14 +30,23 @@ export default function Dashboard({ user }) {
   }
 
   const uploadedNotes = data.totalUploadedNotes ?? data.totalApprovedNotes ?? 0
-  const reqDays = data.totalRequiredDays || 0
-  const progressPct = data.overallProgress ?? 0
+  const hasAssignedSyllabus = Boolean(
+    data.hasAssignedSyllabus === true &&
+    Number(data.totalRequiredDays) > 0 &&
+    data.technologyCards?.some((t) => t.isAssigned === true && Number(t.requiredDays) > 0)
+  )
+  const reqDays = hasAssignedSyllabus ? (Number(data.totalRequiredDays) || 0) : 0
+  const progressPct = hasAssignedSyllabus ? (data.overallProgress ?? 0) : 0
+
+  const learningNotesSubtitle = hasAssignedSyllabus && reqDays > 0
+    ? `${uploadedNotes}/${reqDays} daily notes submitted`
+    : `${uploadedNotes} daily notes submitted`
 
   const cards = [
     {
       title: 'Learning Progress',
       value: `${progressPct}%`,
-      subtitle: `${uploadedNotes}/${reqDays} daily notes submitted`,
+      subtitle: learningNotesSubtitle,
       color: 'from-orange-500 to-red-500',
     },
     {
@@ -103,7 +112,10 @@ export default function Dashboard({ user }) {
                   )}
                 </div>
                 <span className="text-gray-600 font-medium text-xs sm:text-sm">
-                  {tech.uploadedNotes}/{tech.requiredDays} working days · <strong className="text-orange-600">{tech.progress}%</strong>
+                  {tech.isAssigned && tech.requiredDays > 0 ? (
+                    <>{tech.uploadedNotes}/{tech.requiredDays} working days · </>
+                  ) : null}
+                  <strong className="text-orange-600">{tech.progress || 0}%</strong>
                 </span>
               </div>
 
