@@ -351,48 +351,125 @@ exports.sendStatusEmail = async (to, { status }) => {
 // ---------------- Admin Email Alerts ----------------
 
 const getAdminRecipientEmail = async () => {
+  const emails = new Set()
+
   if (process.env.ADMIN_EMAIL && process.env.ADMIN_EMAIL.trim()) {
-    return process.env.ADMIN_EMAIL.trim()
+    process.env.ADMIN_EMAIL.split(',').forEach((e) => {
+      const trimmed = e.trim()
+      if (trimmed) emails.add(trimmed)
+    })
   }
+
+  if (process.env.EMAIL_USER && process.env.EMAIL_USER.trim()) {
+    emails.add(process.env.EMAIL_USER.trim())
+  }
+
   try {
     const Admin = require('../Models/adminModel')
     const adminDocs = await Admin.find().select('email').lean()
     if (adminDocs && adminDocs.length > 0) {
-      const validEmails = adminDocs.map((a) => a.email).filter(Boolean)
-      if (validEmails.length > 0) return validEmails.join(', ')
+      adminDocs.forEach((a) => {
+        if (a.email && a.email.trim()) emails.add(a.email.trim())
+      })
     }
   } catch (err) {
     console.error('Failed to resolve admin email from DB:', err.message)
   }
-  return 'interndeskadmin@gmail.com'
+
+  if (emails.size === 0) {
+    emails.add('interndeskadmin@gmail.com')
+  }
+
+  return [...emails].join(', ')
 }
 
-exports.sendAdminNotesSubmissionEmail = async ({ internName, internEmail, technology, dayNumber, submissionDate }) => {
+exports.sendAdminNewRegistrationEmail = async ({ internName, internEmail, phone, technologies, collegeName, universityName, internshipPeriod, classMode, registrationDate }) => {
   const adminEmail = await getAdminRecipientEmail()
   if (!adminEmail) return
-  const dateStr = submissionDate ? new Date(submissionDate).toLocaleString('en-GB') : new Date().toLocaleString('en-GB')
-  const subject = `[New Submission] Daily Notes – ${internName} (${technology} Day ${dayNumber})`
+  const dateStr = registrationDate ? new Date(registrationDate).toLocaleString('en-GB') : new Date().toLocaleString('en-GB')
+  const techList = Array.isArray(technologies) && technologies.length > 0 ? technologies.join(', ') : 'Not specified'
+  const subject = `[Action Required] New Intern Registration – ${internName} (${techList})`
 
   const mailOptions = {
     from: `"Intern Desk Alerts" <${process.env.EMAIL_USER}>`,
     to: adminEmail,
     subject,
-    text: `Admin Alert:\n\nIntern ${internName} (${internEmail}) has uploaded their Day ${dayNumber} Daily Notes and Book for ${technology}.\n\nSubmitted at: ${dateStr}\n\nPlease log in to the Admin Portal (List Daily Notes) to review and grade this submission.`,
+    text: `Admin Alert:\n\nA new intern has registered and is waiting for your action (Approve or Reject).\n\nIntern Details:\n- Name: ${internName}\n- Email: ${internEmail}\n- Phone: ${phone || '—'}\n- Technologies: ${techList}\n- College: ${collegeName || '—'}\n- University: ${universityName || '—'}\n- Period: ${internshipPeriod || '—'}\n- Mode: ${classMode || 'Online'}\n- Registered On: ${dateStr}\n\nPlease log in to the Admin Portal (Registrations module) to review this application and Approve or Reject the intern.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+        <div style="background-color: #0f1a2e; padding: 22px; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Intern Desk · Admin Alert</h1>
+          <p style="color: #f97316; margin: 5px 0 0; font-size: 13px; font-weight: bold;">👤 New Intern Registration</p>
+        </div>
+        <div style="padding: 24px; background-color: #ffffff;">
+          <div style="padding: 14px 16px; background-color: #fff7ed; border: 1px solid #ffedd5; border-left: 4px solid #f97316; border-radius: 8px; margin-bottom: 18px;">
+            <p style="margin: 0; font-size: 14px; font-weight: 700; color: #9a3412;">
+              ⚠️ Action Required: Intern Waiting for Approval
+            </p>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #c2410c;">
+              A new candidate has registered and is waiting for your decision. Please review the details below and approve or reject the application.
+            </p>
+          </div>
+
+          <h2 style="margin: 0 0 14px; font-size: 16px; color: #111827;">Applicant Information</h2>
+          <div style="padding: 16px; background-color: #f8fafc; border-radius: 8px; font-size: 14px; color: #334155; line-height: 1.7; margin-bottom: 18px;">
+            <p style="margin: 0;"><strong>Full Name:</strong> ${internName}</p>
+            <p style="margin: 4px 0 0;"><strong>Email ID:</strong> <a href="mailto:${internEmail}" style="color: #ea580c; text-decoration: none;">${internEmail}</a></p>
+            <p style="margin: 4px 0 0;"><strong>Phone Number:</strong> ${phone || '—'}</p>
+            <p style="margin: 4px 0 0;"><strong>Track / Technologies:</strong> <strong style="color: #0f1a2e;">${techList}</strong></p>
+            <p style="margin: 4px 0 0;"><strong>College:</strong> ${collegeName || '—'}</p>
+            <p style="margin: 4px 0 0;"><strong>University:</strong> ${universityName || '—'}</p>
+            <p style="margin: 4px 0 0;"><strong>Internship Duration:</strong> ${internshipPeriod || '—'}</p>
+            <p style="margin: 4px 0 0;"><strong>Mode of Study:</strong> ${classMode || 'Online'}</p>
+            <p style="margin: 4px 0 0;"><strong>Registered At:</strong> ${dateStr}</p>
+          </div>
+
+          <p style="font-size: 13px; color: #64748b; margin: 0; line-height: 1.5;">
+            Please log in to the <strong>Admin Portal &gt; Registrations</strong> to inspect the candidate and take action: <strong>Approve</strong> to create active credentials and syllabus assignment, or <strong>Reject</strong>.
+          </p>
+        </div>
+        <div style="padding: 14px; text-align: center; background-color: #f1f5f9; border-top: 1px solid #e2e8f0;">
+          <p style="font-size: 11px; color: #94a3b8; margin: 0;">Intern Desk Admin Notification System</p>
+        </div>
+      </div>
+    `,
+  }
+  try {
+    await transporter.sendMail(mailOptions)
+  } catch (err) {
+    console.error('Failed to send admin new registration email alert:', err.message)
+  }
+}
+
+exports.sendAdminNotesSubmissionEmail = async ({ internName, internEmail, technology, dayNumber, submissionDate, isReupload }) => {
+  const adminEmail = await getAdminRecipientEmail()
+  if (!adminEmail) return
+  const dateStr = submissionDate ? new Date(submissionDate).toLocaleString('en-GB') : new Date().toLocaleString('en-GB')
+  const subject = isReupload
+    ? `[Re-uploaded] Daily Notes – ${internName} (${technology} Day ${dayNumber})`
+    : `[New Submission] Daily Notes – ${internName} (${technology} Day ${dayNumber})`
+
+  const mailOptions = {
+    from: `"Intern Desk Alerts" <${process.env.EMAIL_USER}>`,
+    to: adminEmail,
+    subject,
+    text: `Admin Alert:\n\nIntern ${internName} (${internEmail}) has ${isReupload ? 're-uploaded revised' : 'uploaded'} Day ${dayNumber} Daily Notes and Book for ${technology}.\n\nSubmitted at: ${dateStr}\n\nPlease log in to the Admin Portal (List Daily Notes) to review and grade this submission.`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
         <div style="background-color: #0f1a2e; padding: 20px; text-align: center;">
           <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Intern Desk · Admin Alert</h1>
-          <p style="color: #f97316; margin: 4px 0 0; font-size: 13px; font-weight: bold;">📝 Daily Notes Submission</p>
+          <p style="color: #f97316; margin: 4px 0 0; font-size: 13px; font-weight: bold;">📝 ${isReupload ? 'Daily Notes Re-uploaded' : 'Daily Notes Submission'}</p>
         </div>
         <div style="padding: 24px; background-color: #ffffff;">
-          <h2 style="margin: 0 0 14px; font-size: 16px; color: #111827;">New Daily Notes Uploaded</h2>
+          <h2 style="margin: 0 0 14px; font-size: 16px; color: #111827;">${isReupload ? 'Revised Daily Notes Re-uploaded' : 'New Daily Notes Uploaded'}</h2>
           <div style="padding: 16px; background-color: #f8fafc; border-radius: 8px; border-left: 4px solid #f97316; margin-bottom: 16px; font-size: 14px; color: #334155; line-height: 1.6;">
             <p style="margin: 0;"><strong>Intern:</strong> ${internName} (${internEmail})</p>
             <p style="margin: 4px 0 0;"><strong>Technology:</strong> ${technology}</p>
             <p style="margin: 4px 0 0;"><strong>Day Number:</strong> Day ${dayNumber}</p>
+            <p style="margin: 4px 0 0;"><strong>Submission Type:</strong> ${isReupload ? '<span style="color: #ea580c; font-weight: bold;">Revised Re-upload</span>' : 'Initial Submission'}</p>
             <p style="margin: 4px 0 0;"><strong>Submitted:</strong> ${dateStr}</p>
           </div>
-          <p style="font-size: 13px; color: #64748b; margin: 0;">Log in to the Admin Portal to review the uploaded .docx notes and .xlsx book files and provide feedback.</p>
+          <p style="font-size: 13px; color: #64748b; margin: 0;">Log in to the Admin Portal to review the updated .docx notes and .xlsx book files and provide feedback.</p>
         </div>
         <div style="padding: 14px; text-align: center; background-color: #f1f5f9; border-top: 1px solid #e2e8f0;">
           <p style="font-size: 11px; color: #94a3b8; margin: 0;">Intern Desk Admin Notification System</p>

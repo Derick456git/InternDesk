@@ -85,11 +85,34 @@ export default function UploadNotes({ onNavigate }) {
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 6
 
-  const validApprovedOrPendingKeys = new Set(
-    submissions.filter((s) => s.status !== 'Rejected').map((s) => s.technology + '-' + s.dayNumber)
-  )
+  const isSubmissionRejected = (s) => {
+    if (!s) return false
+    return (
+      s.status === 'Rejected' ||
+      s.reviewStatus === 'Rejected' ||
+      String(s.status).toLowerCase() === 'rejected' ||
+      String(s.reviewStatus).toLowerCase() === 'rejected'
+    )
+  }
+
+  const isSubmissionApproved = (s) => {
+    if (!s) return false
+    return (
+      s.status === 'Approved' ||
+      s.reviewStatus === 'Completed' ||
+      String(s.status).toLowerCase() === 'approved' ||
+      String(s.reviewStatus).toLowerCase() === 'completed'
+    )
+  }
+
   const rejectedKeys = new Set(
-    submissions.filter((s) => s.status === 'Rejected').map((s) => s.technology + '-' + s.dayNumber)
+    submissions.filter(isSubmissionRejected).map((s) => s.technology + '-' + s.dayNumber)
+  )
+  const approvedKeys = new Set(
+    submissions.filter(isSubmissionApproved).map((s) => s.technology + '-' + s.dayNumber)
+  )
+  const submittedKeys = new Set(
+    submissions.map((s) => s.technology + '-' + s.dayNumber)
   )
 
   useEffect(() => {
@@ -300,8 +323,27 @@ export default function UploadNotes({ onNavigate }) {
     if (!technology) return setAlert({ type: 'error', message: 'Please select a technology.' })
     if (!dayNumber) return setAlert({ type: 'error', message: 'Please select a day.' })
 
-    const isRejected = rejectedKeys.has(technology + '-' + dayNumber)
-    if (!isRejected) {
+    const key = technology + '-' + dayNumber
+    const isApproved = approvedKeys.has(key)
+    const isRejected = rejectedKeys.has(key)
+    const isAlreadySubmitted = submittedKeys.has(key)
+
+    if (isApproved) {
+      return setAlert({
+        type: 'error',
+        message: `Day ${dayNumber} notes have already been approved. Approved notes cannot be re-uploaded.`,
+      })
+    }
+
+    if (isAlreadySubmitted && !isRejected) {
+      return setAlert({
+        type: 'error',
+        message: `Day ${dayNumber} notes are currently under review by the admin. Re-upload is only required if the admin requests revision.`,
+      })
+    }
+
+    // Only apply scheduling / sequential / test locks if it is a brand new submission
+    if (!isRejected && !isAlreadySubmitted) {
       const futureStatus = getFutureDayStatus(selectedAssignment, dayNumber)
       if (futureStatus.isFuture) {
         return setAlert({
@@ -476,7 +518,7 @@ export default function UploadNotes({ onNavigate }) {
                   {technology} Test {activeBlockingAssessment.testNumber} is Unlocked!
                 </h4>
                 <p className="text-xs text-amber-700 mt-0.5">
-                  You have uploaded all 5 daily notes for Days {activeBlockingAssessment.startDay}–{activeBlockingAssessment.endDay}. You must attend and submit <strong>Test {activeBlockingAssessment.testNumber}</strong> in 'Attend Test' before you can upload notes for Day {activeBlockingAssessment.nextDay} onwards.
+                  You have uploaded all 5 daily notes for Days {activeBlockingAssessment.startDay}–${activeBlockingAssessment.endDay}. You must attend and submit <strong>Test {activeBlockingAssessment.testNumber}</strong> in 'Attend Test' before you can upload notes for Day {activeBlockingAssessment.nextDay} onwards.
                 </p>
               </div>
             </div>
@@ -544,15 +586,17 @@ export default function UploadNotes({ onNavigate }) {
                 >
                   <option value="">{dayOptions.length === 0 ? (technology ? 'No days available' : 'Select technology first') : 'Select Day'}</option>
                   {dayOptions.map((day) => {
-                    const isRejected = rejectedKeys.has(technology + '-' + day)
-                    const isAlreadySubmitted = validApprovedOrPendingKeys.has(technology + '-' + day)
+                    const key = technology + '-' + day
+                    const isRejected = rejectedKeys.has(key)
+                    const isApproved = approvedKeys.has(key)
+                    const isSubmitted = submittedKeys.has(key)
                     const seqStatus = getSequentialDayStatus(technology, day)
                     const lockStatus = getDayLockStatus(technology, day)
                     const futureStatus = getFutureDayStatus(selectedAssignment, day)
                     const scheduledDate = futureStatus.scheduledDate || getWorkingDateForDay(selectedAssignment?.startDate, day)
                     const formattedDayDate = scheduledDate ? formatDateWithDay(scheduledDate) : ''
 
-                    const isLocked = !isRejected && (isAlreadySubmitted || futureStatus.isFuture || seqStatus.isLocked || lockStatus.isLocked)
+                    const isLocked = isApproved || (isSubmitted && !isRejected) || (!isRejected && (futureStatus.isFuture || seqStatus.isLocked || lockStatus.isLocked))
 
                     return (
                       <option
@@ -563,8 +607,10 @@ export default function UploadNotes({ onNavigate }) {
                         Day {day} {formattedDayDate ? `· ${formattedDayDate}` : ''}
                         {isRejected
                           ? ' (⚠️ Revision Required - Click to Re-upload)'
-                          : isAlreadySubmitted
-                          ? ' (Submitted)'
+                          : isApproved
+                          ? ' (Approved)'
+                          : isSubmitted
+                          ? ' (Submitted - Under Review)'
                           : futureStatus.isFuture
                           ? ` (Locked - Unlocks on ${formattedDayDate})`
                           : seqStatus.isLocked
@@ -713,8 +759,8 @@ export default function UploadNotes({ onNavigate }) {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {paginatedSubmissions.map((sub) => {
-                    const isApproved = sub.status === 'Approved'
-                    const isRejected = sub.status === 'Rejected'
+                    const isApproved = isSubmissionApproved(sub)
+                    const isRejected = isSubmissionRejected(sub)
                     const isReviewed = Boolean(sub.feedbackMark && sub.feedbackMark !== 'Pending')
 
                     return (

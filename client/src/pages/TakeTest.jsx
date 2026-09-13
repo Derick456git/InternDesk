@@ -17,8 +17,9 @@ export default function TakeTest() {
   const [submitting, setSubmitting] = useState(false)
   const [timeLeft, setTimeLeft] = useState(20) // Initial question countdown
 
-  // Confirmation Modals
+  // Confirmation & Course Completion Modals
   const [showSubmitModal, setShowSubmitModal] = useState(false)
+  const [courseCompletedModal, setCourseCompletedModal] = useState(null)
 
   const currentIndexRef = useRef(currentIndex)
   currentIndexRef.current = currentIndex
@@ -137,6 +138,19 @@ export default function TakeTest() {
       }
 
       const res = await api.post('/client/submit-test', payload)
+
+      if (res?.isFinalAssessment || res?.courseCompletion) {
+        const comp = res.courseCompletion || {}
+        const courseName = comp.courseName || comp.technology || technology
+        const durationStr = comp.duration || `${comp.durationDays || currentTest.syllabusDuration || 30} Days`
+
+        setCourseCompletedModal({
+          courseName,
+          duration: durationStr,
+          message: comp.message || `Congratulations, your "${courseName}" "${durationStr}" have completed successfully. now you will be assign for a task after this`,
+        })
+        return
+      }
 
       setAlert({
         type: 'success',
@@ -456,6 +470,58 @@ export default function TakeTest() {
                 className="px-5 py-2 text-sm font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {submitting ? 'Submitting...' : 'Yes, Submit Assessment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Course Completed Celebration Modal */}
+      {courseCompletedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-7 sm:p-8 mx-4 animate-scaleUp space-y-6 text-center border border-gray-100">
+            {/* Animated Trophy / Graduation Icon */}
+            <div className="relative inline-block">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-amber-400 to-orange-500 text-white flex items-center justify-center mx-auto text-4xl shadow-xl shadow-orange-200 animate-bounce">
+                🎓
+              </div>
+              <span className="absolute -top-2 -right-2 text-2xl animate-spin">✨</span>
+            </div>
+
+            <div className="space-y-2">
+              <span className="inline-block px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-green-100 text-green-700 border border-green-200">
+                Course Successfully Completed! 🎉
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black text-gray-900 leading-tight">
+                Congratulations!
+              </h3>
+            </div>
+
+            {/* User Requested Dynamic Message Card */}
+            <div className="p-5 bg-gradient-to-br from-orange-50 to-amber-50/80 border border-orange-200 rounded-2xl text-left space-y-2.5 shadow-xs">
+              <p className="text-sm font-bold text-gray-900 leading-relaxed text-center sm:text-left">
+                Congratulations, your{' '}
+                <strong className="text-orange-600 font-extrabold">"{courseCompletedModal.courseName}"</strong>{' '}
+                <strong className="text-orange-600 font-extrabold">"{courseCompletedModal.duration}"</strong> have completed successfully. now you will be assign for a task after this.
+              </p>
+              <div className="pt-2 border-t border-orange-200/80 flex items-center justify-between text-xs text-gray-600">
+                <span className="font-semibold">Track: {courseCompletedModal.courseName}</span>
+                <span className="font-semibold text-orange-700">{courseCompletedModal.duration}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-500 leading-relaxed max-w-md mx-auto">
+              All daily notes and assessments for this course track have been completed. Your administrator has been notified to evaluate your answers and assign your final practical project task.
+            </p>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => navigate('/portal')}
+                className="w-full py-3 px-6 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 rounded-2xl shadow-lg shadow-orange-200 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>Continue to Dashboard</span>
+                <span>→</span>
               </button>
             </div>
           </div>

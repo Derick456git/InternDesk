@@ -174,6 +174,9 @@ exports.submit = async (req, res) => {
       console.error('Failed to send admin test email alert:', emailErr.message)
     }
 
+    let courseCompletionData = null
+    let isFinalAssessment = false
+
     // ---------------- Course Completion Check ----------------
     // When the intern submits their final assessment for this technology track
     try {
@@ -207,9 +210,19 @@ exports.submit = async (req, res) => {
       }
 
       const totalAssessments = Math.max(1, Math.floor(durationDays / 5))
-      const isFinalAssessment = currentAssNum >= totalAssessments
+      isFinalAssessment = currentAssNum >= totalAssessments
 
       if (isFinalAssessment) {
+        const durationStr = `${durationDays} Days`
+        courseCompletionData = {
+          technology,
+          courseName: technology,
+          duration: durationStr,
+          durationDays,
+          totalAssessments,
+          message: `Congratulations, your "${technology}" "${durationStr}" have completed successfully. now you will be assign for a task after this`,
+        }
+
         // 1. Intern Portal In-App Notification
         try {
           await Notification.create({
@@ -289,6 +302,8 @@ exports.submit = async (req, res) => {
       success: true,
       message: 'Test submitted successfully. Objective answers scored; descriptive answers pending admin evaluation.',
       data: submission,
+      isFinalAssessment: Boolean(isFinalAssessment),
+      courseCompletion: courseCompletionData,
     })
   } catch (error) {
     console.error('Submit test error:', error)

@@ -84,12 +84,25 @@ exports.createDailyNote = async (req, res) => {
       technology,
       dayNumber: day,
     })
-    const isReupload = existingSubmission && existingSubmission.status === 'Rejected'
+
+    const isAlreadyApproved = existingSubmission && (
+      existingSubmission.status === 'Approved' ||
+      existingSubmission.reviewStatus === 'Completed' ||
+      String(existingSubmission.status).toLowerCase() === 'approved'
+    )
+    const isReupload = existingSubmission && (
+      existingSubmission.status === 'Rejected' ||
+      existingSubmission.reviewStatus === 'Rejected' ||
+      String(existingSubmission.status).toLowerCase() === 'rejected' ||
+      String(existingSubmission.reviewStatus).toLowerCase() === 'rejected'
+    )
 
     if (existingSubmission && !isReupload) {
       return res.status(400).json({
         success: false,
-        message: `You have already submitted notes for Day ${day}. Status: ${existingSubmission.status}.`,
+        message: isAlreadyApproved
+          ? `Day ${day} notes have already been approved.`
+          : `Day ${day} notes have already been submitted and are under review. Re-upload is only available if revision is requested by admin.`,
       })
     }
 
@@ -195,6 +208,7 @@ exports.createDailyNote = async (req, res) => {
         status: 'Pending',
         reviewStatus: 'Pending',
         feedbackMark: 'Pending',
+        adminFeedback: '',
       },
       { upsert: true, new: true }
     )
@@ -227,6 +241,7 @@ exports.createDailyNote = async (req, res) => {
         technology,
         dayNumber: day,
         submissionDate: new Date(),
+        isReupload: Boolean(isReupload),
       })
     } catch (emailErr) {
       console.error('Failed to send admin notes email alert:', emailErr.message)

@@ -2,7 +2,7 @@ const Registration = require('../Models/registrationModel')
 const Intern = require('../Models/internModel')
 const Notification = require('../Models/notificationModel')
 const bcrypt = require('bcryptjs')
-const { sendStatusEmail } = require('../config/mailer')
+const { sendStatusEmail, sendAdminNewRegistrationEmail } = require('../config/mailer')
 
 const syncInternAccount = async (registration) => {
   const hashedPassword = registration.password || (await bcrypt.hash('intern123', 10))
@@ -70,6 +70,47 @@ exports.create = async (req, res) => {
         technologies: techs,
         technology: techs[0] || '',
       })
+    }
+
+    // Create in-app notification for admin
+    try {
+      await Notification.create({
+        recipientRole: 'admin',
+        internName: name,
+        internEmail: email,
+        title: `New Intern Registration: ${name}`,
+        message: `${name} (${email}) has registered and is waiting for your approval. Please review and approve or reject the application.`,
+        type: 'registration_pending',
+        referenceId: registration._id,
+        meta: {
+          internId: registration._id,
+          technologies: techs,
+          phone,
+          collegeName,
+          universityName,
+          internshipPeriod,
+          classMode,
+        },
+      })
+    } catch (notifErr) {
+      console.error('Failed to create admin registration notification:', notifErr.message)
+    }
+
+    // Send email alert to admin
+    try {
+      await sendAdminNewRegistrationEmail({
+        internName: name,
+        internEmail: email,
+        phone,
+        technologies: techs,
+        collegeName,
+        universityName,
+        internshipPeriod,
+        classMode,
+        registrationDate: new Date(),
+      })
+    } catch (emailErr) {
+      console.error('Failed to send admin registration email alert:', emailErr.message)
     }
 
     res.status(201).json({

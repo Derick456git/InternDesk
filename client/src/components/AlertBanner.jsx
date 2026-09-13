@@ -1,12 +1,19 @@
 export default function AlertBanner({ type = 'error', message, onClose }) {
   if (!message) return null
 
-  const colors =
-    type === 'success'
-      ? 'bg-green-50 border-green-300 text-green-800'
-      : 'bg-red-50 border-red-300 text-red-800'
+  let colors = 'bg-red-50 border-red-300 text-red-800'
+  let label = 'Error!'
 
-  const label = type === 'success' ? 'Success!' : 'Error!'
+  if (type === 'success') {
+    colors = 'bg-green-50 border-green-300 text-green-800'
+    label = 'Success!'
+  } else if (type === 'info') {
+    colors = 'bg-blue-50 border-blue-300 text-blue-800'
+    label = 'Info:'
+  } else if (type === 'warning') {
+    colors = 'bg-amber-50 border-amber-300 text-amber-800'
+    label = 'Notice:'
+  }
 
   return (
     <div className={`mb-4 px-4 py-3 rounded-lg border ${colors} flex items-start justify-between gap-2 text-sm`} role="alert">
