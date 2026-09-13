@@ -92,16 +92,36 @@ export default function Dashboard({ user }) {
             <p className="text-sm text-gray-400">No technology tracks enrolled yet.</p>
           )}
           {data.technologyCards?.map((tech) => (
-            <div key={tech.technology} className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-bold text-gray-800">{tech.technology}</span>
-                <span className="text-gray-600 font-medium">
-                  {tech.uploadedNotes}/{tech.requiredDays} days · <strong className="text-orange-600">{tech.progress}%</strong>
+            <div key={tech.technology} className="p-4 rounded-xl bg-gray-50 border border-gray-100 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-sm">
+                <div>
+                  <span className="font-bold text-gray-800">{tech.technology}</span>
+                  {tech.syllabusName && (
+                    <span className="ml-2 text-xs font-semibold px-2 py-0.5 bg-orange-100 text-orange-700 rounded-md">
+                      {tech.syllabusName}
+                    </span>
+                  )}
+                </div>
+                <span className="text-gray-600 font-medium text-xs sm:text-sm">
+                  {tech.uploadedNotes}/{tech.requiredDays} working days · <strong className="text-orange-600">{tech.progress}%</strong>
                 </span>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+
+              {tech.startDateFormatted && tech.endDateFormatted && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                  <span className="inline-flex items-center gap-1 font-medium text-gray-700">
+                    📅 <span>Schedule:</span>
+                  </span>
+                  <span className="font-semibold text-gray-800">{tech.startDateFormatted}</span>
+                  <span className="text-gray-400">to</span>
+                  <span className="font-semibold text-gray-800">{tech.endDateFormatted}</span>
+                  <span className="text-gray-500 font-medium">({tech.requiredDays} Working Days · Mon–Fri)</span>
+                </div>
+              )}
+
+              <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                 <div
-                  className="h-3 rounded-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-500"
+                  className="h-2.5 rounded-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-500"
                   style={{ width: `${Math.min(100, tech.progress || 0)}%` }}
                 />
               </div>

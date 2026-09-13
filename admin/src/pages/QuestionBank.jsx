@@ -3,8 +3,8 @@ import { api } from '../api'
 import AlertBanner from '../components/AlertBanner'
 
 const tabs = [
-  { key: 'add-topics', label: 'Add Topics' },
-  { key: 'list-topics', label: 'List Topics' },
+  { key: 'add-chapters', label: 'Add Chapters' },
+  { key: 'list-chapters', label: 'List Chapters' },
   { key: 'add-question', label: 'Add Question' },
   { key: 'list-questions', label: 'List Questions' },
 ]
@@ -12,14 +12,14 @@ const tabs = [
 export default function QuestionBank({ tab, onTabChange }) {
   const [topics, setTopics] = useState([])
   const [technologies, setTechnologies] = useState([])
-  const [topicInput, setTopicInput] = useState('')
-  const [topicSearch, setTopicSearch] = useState('')
-  const [topicPage, setTopicPage] = useState(1)
-  const TOPICS_PER_PAGE = 8
+  const [chapterInput, setChapterInput] = useState('')
+  const [chapterSearch, setChapterSearch] = useState('')
+  const [chapterPage, setChapterPage] = useState(1)
+  const CHAPTERS_PER_PAGE = 8
 
   const [questions, setQuestions] = useState([])
   const [editingId, setEditingId] = useState(null)
-  const [deleteTopicModal, setDeleteTopicModal] = useState(null) // { id, title }
+  const [deleteChapterModal, setDeleteChapterModal] = useState(null) // { id, title }
   const [deleteQuestionModal, setDeleteQuestionModal] = useState(null) // question object
   const [questionPage, setQuestionPage] = useState(1)
   const [questionSearch, setQuestionSearch] = useState('')
@@ -39,7 +39,7 @@ export default function QuestionBank({ tab, onTabChange }) {
 
   useEffect(() => {
     fetchQuestions()
-    fetchTopics()
+    fetchChapters()
     fetchTechnologies()
   }, [])
 
@@ -52,12 +52,12 @@ export default function QuestionBank({ tab, onTabChange }) {
     }
   }
 
-  const fetchTopics = async () => {
+  const fetchChapters = async () => {
     try {
-      const res = await api.get('/topics')
+      const res = await api.get('/chapters')
       setTopics(res.data || [])
     } catch (err) {
-      console.error('Fetch topics error:', err)
+      console.error('Fetch chapters error:', err)
     }
   }
 
@@ -70,48 +70,48 @@ export default function QuestionBank({ tab, onTabChange }) {
     }
   }
 
-  const addTopic = async () => {
-    if (!topicInput.trim()) return
-    const title = topicInput.trim()
+  const addChapter = async () => {
+    if (!chapterInput.trim()) return
+    const title = chapterInput.trim()
     if (topics.find((t) => (t.name || t.title || '').toLowerCase() === title.toLowerCase())) {
-      setAlert({ type: 'error', message: `Topic "${title}" already exists.` })
+      setAlert({ type: 'error', message: `Chapter "${title}" already exists.` })
       return
     }
     try {
-      const res = await api.post('/topics', { name: title })
-      const createdTopic = res.data || { _id: title, name: title }
-      setTopics((prev) => [...prev, createdTopic])
-      setTopicInput('')
-      setAlert({ type: 'success', message: `Topic "${title}" added successfully.` })
+      const res = await api.post('/chapters', { name: title })
+      const createdChapter = res.data || { _id: title, name: title }
+      setTopics((prev) => [...prev, createdChapter])
+      setChapterInput('')
+      setAlert({ type: 'success', message: `Chapter "${title}" added successfully.` })
     } catch (err) {
-      console.error('Add topic error:', err)
-      setAlert({ type: 'error', message: err.message || `Failed to add topic "${title}".` })
+      console.error('Add chapter error:', err)
+      setAlert({ type: 'error', message: err.message || `Failed to add chapter "${title}".` })
     }
   }
 
-  const handleOpenDeleteTopic = (topic) => {
-    setDeleteTopicModal(topic)
+  const handleOpenDeleteChapter = (chapter) => {
+    setDeleteChapterModal(chapter)
   }
 
-  const handleConfirmDeleteTopic = async () => {
-    if (!deleteTopicModal) return
-    const topicId = deleteTopicModal._id || deleteTopicModal.id
-    const topicTitle = deleteTopicModal.name || deleteTopicModal.title
+  const handleConfirmDeleteChapter = async () => {
+    if (!deleteChapterModal) return
+    const chapterId = deleteChapterModal._id || deleteChapterModal.id
+    const chapterTitle = deleteChapterModal.name || deleteChapterModal.title
     try {
-      if (deleteTopicModal._id) {
-        await api.delete(`/topics/${deleteTopicModal._id}`)
+      if (deleteChapterModal._id) {
+        await api.delete(`/chapters/${deleteChapterModal._id}`)
       }
-      const nextTopics = topics.filter((t) => (t._id || t.id) !== topicId && (t.name || t.title) !== topicTitle)
-      setTopics(nextTopics)
-      const newTotalPages = Math.ceil(nextTopics.length / TOPICS_PER_PAGE) || 1
-      if (topicPage > newTotalPages) {
-        setTopicPage(newTotalPages)
+      const nextChapters = topics.filter((t) => (t._id || t.id) !== chapterId && (t.name || t.title) !== chapterTitle)
+      setTopics(nextChapters)
+      const newTotalPages = Math.ceil(nextChapters.length / CHAPTERS_PER_PAGE) || 1
+      if (chapterPage > newTotalPages) {
+        setChapterPage(newTotalPages)
       }
-      setAlert({ type: 'success', message: `Topic "${topicTitle}" has been deleted.` })
-      setDeleteTopicModal(null)
+      setAlert({ type: 'success', message: `Chapter "${chapterTitle}" has been deleted.` })
+      setDeleteChapterModal(null)
     } catch (err) {
-      console.error('Delete topic error:', err)
-      setAlert({ type: 'error', message: err.message || 'Failed to delete topic.' })
+      console.error('Delete chapter error:', err)
+      setAlert({ type: 'error', message: err.message || 'Failed to delete chapter.' })
     }
   }
 
@@ -222,14 +222,14 @@ export default function QuestionBank({ tab, onTabChange }) {
     questionPage * QUESTIONS_PER_PAGE
   )
 
-  // Topics filtering and pagination (8 per page)
-  const filteredTopics = topics.filter((t) =>
-    topicSearch ? (t.name || t.title || '').toLowerCase().includes(topicSearch.toLowerCase()) : true
+  // Chapters filtering and pagination (8 per page)
+  const filteredChapters = topics.filter((t) =>
+    chapterSearch ? (t.name || t.title || '').toLowerCase().includes(chapterSearch.toLowerCase()) : true
   )
-  const totalTopicPages = Math.ceil(filteredTopics.length / TOPICS_PER_PAGE) || 1
-  const paginatedTopics = filteredTopics.slice(
-    (topicPage - 1) * TOPICS_PER_PAGE,
-    topicPage * TOPICS_PER_PAGE
+  const totalChapterPages = Math.ceil(filteredChapters.length / CHAPTERS_PER_PAGE) || 1
+  const paginatedChapters = filteredChapters.slice(
+    (chapterPage - 1) * CHAPTERS_PER_PAGE,
+    chapterPage * CHAPTERS_PER_PAGE
   )
 
   const difficultyBadge = (d) => {
@@ -237,8 +237,8 @@ export default function QuestionBank({ tab, onTabChange }) {
     return `${colors[d] || 'bg-gray-100 text-gray-700'} px-2 py-0.5 rounded-full text-xs font-medium`
   }
 
-  const associatedQuestionsCount = deleteTopicModal
-    ? questions.filter((q) => q.topic?.toLowerCase() === (deleteTopicModal.name || deleteTopicModal.title)?.toLowerCase()).length
+  const associatedQuestionsCount = deleteChapterModal
+    ? questions.filter((q) => q.topic?.toLowerCase() === (deleteChapterModal.name || deleteChapterModal.title)?.toLowerCase()).length
     : 0
 
   return (
@@ -273,33 +273,33 @@ export default function QuestionBank({ tab, onTabChange }) {
         onClose={() => setAlert({ type: 'success', message: '' })}
       />
 
-      {tab === 'add-topics' && (
+      {tab === 'add-chapters' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-lg">
-          <h3 className="font-semibold text-gray-800 mb-4">Add New Topic</h3>
+          <h3 className="font-semibold text-gray-800 mb-4">Add New Chapter</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Topic Title</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Chapter Title</label>
               <input
                 type="text"
-                value={topicInput}
-                onChange={(e) => setTopicInput(e.target.value)}
+                value={chapterInput}
+                onChange={(e) => setChapterInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') addTopic()
+                  if (e.key === 'Enter') addChapter()
                 }}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition"
-                placeholder="Enter topic title (e.g. State Management, React Hooks)"
+                placeholder="Enter chapter title (e.g. State Management, React Hooks)"
               />
             </div>
             <div className="flex gap-3">
               <button
-                onClick={addTopic}
-                className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
+                onClick={addChapter}
+                className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm cursor-pointer"
               >
-                Save Topic
+                Save Chapter
               </button>
               <button
-                onClick={() => setTopicInput('')}
-                className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors"
+                onClick={() => setChapterInput('')}
+                className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -308,7 +308,7 @@ export default function QuestionBank({ tab, onTabChange }) {
         </div>
       )}
 
-      {tab === 'list-topics' && (
+      {tab === 'list-chapters' && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -316,9 +316,9 @@ export default function QuestionBank({ tab, onTabChange }) {
                 📚
               </span>
               <div>
-                <h3 className="font-bold text-gray-800 text-base">Topics Catalog</h3>
+                <h3 className="font-bold text-gray-800 text-base">Chapters Catalog</h3>
                 <p className="text-xs text-gray-500">
-                  Total: <strong className="text-gray-700">{topics.length}</strong> topics (8 per page)
+                  Total: <strong className="text-gray-700">{topics.length}</strong> chapters (8 per page)
                 </p>
               </div>
             </div>
@@ -326,11 +326,11 @@ export default function QuestionBank({ tab, onTabChange }) {
             <div className="w-full sm:w-64">
               <input
                 type="text"
-                placeholder="Search topics..."
-                value={topicSearch}
+                placeholder="Search chapters..."
+                value={chapterSearch}
                 onChange={(e) => {
-                  setTopicSearch(e.target.value)
-                  setTopicPage(1)
+                  setChapterSearch(e.target.value)
+                  setChapterPage(1)
                 }}
                 className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-orange-400 outline-none"
               />
@@ -338,31 +338,31 @@ export default function QuestionBank({ tab, onTabChange }) {
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            {filteredTopics.length === 0 ? (
+            {filteredChapters.length === 0 ? (
               <div className="px-5 py-10 text-center text-gray-400 text-sm">
-                {topicSearch ? `No topics match "${topicSearch}".` : 'No topics added yet.'}
+                {chapterSearch ? `No chapters match "${chapterSearch}".` : 'No chapters added yet.'}
               </div>
             ) : (
               <>
                 <div className="divide-y divide-gray-100">
-                  {paginatedTopics.map((t, idx) => {
-                    const topicTitle = t.name || t.title
-                    const count = questions.filter((q) => q.topic?.toLowerCase() === topicTitle?.toLowerCase()).length
-                    const serialNo = (topicPage - 1) * TOPICS_PER_PAGE + idx + 1
+                  {paginatedChapters.map((t, idx) => {
+                    const chapterTitle = t.name || t.title
+                    const count = questions.filter((q) => q.topic?.toLowerCase() === chapterTitle?.toLowerCase()).length
+                    const serialNo = (chapterPage - 1) * CHAPTERS_PER_PAGE + idx + 1
 
                     return (
-                      <div key={t._id || t.id || topicTitle} className="px-5 py-3.5 flex items-center justify-between hover:bg-orange-50/50 transition-colors">
+                      <div key={t._id || t.id || chapterTitle} className="px-5 py-3.5 flex items-center justify-between hover:bg-orange-50/50 transition-colors">
                         <div className="flex items-center gap-3">
                           <span className="w-7 h-7 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
                             {serialNo}
                           </span>
                           <div>
-                            <span className="text-sm font-bold text-gray-800 block">{topicTitle}</span>
+                            <span className="text-sm font-bold text-gray-800 block">{chapterTitle}</span>
                             <span className="text-xs text-gray-400">{count} associated question(s)</span>
                           </div>
                         </div>
                         <button
-                          onClick={() => handleOpenDeleteTopic(t)}
+                          onClick={() => handleOpenDeleteChapter(t)}
                           className="px-3.5 py-2 text-xs font-bold text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -376,31 +376,31 @@ export default function QuestionBank({ tab, onTabChange }) {
                 </div>
 
                 {/* 8-Item Pagination Bar */}
-                {totalTopicPages > 1 && (
+                {totalChapterPages > 1 && (
                   <div className="px-5 py-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-gray-50/60">
                     <span className="text-xs text-gray-500">
-                      Showing <strong className="text-gray-700">{(topicPage - 1) * TOPICS_PER_PAGE + 1}</strong> to{' '}
-                      <strong className="text-gray-700">{Math.min(topicPage * TOPICS_PER_PAGE, filteredTopics.length)}</strong> of{' '}
-                      <strong className="text-gray-700">{filteredTopics.length}</strong> topics
+                      Showing <strong className="text-gray-700">{(chapterPage - 1) * CHAPTERS_PER_PAGE + 1}</strong> to{' '}
+                      <strong className="text-gray-700">{Math.min(chapterPage * CHAPTERS_PER_PAGE, filteredChapters.length)}</strong> of{' '}
+                      <strong className="text-gray-700">{filteredChapters.length}</strong> chapters
                     </span>
 
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setTopicPage((p) => Math.max(p - 1, 1))}
-                        disabled={topicPage === 1}
+                        onClick={() => setChapterPage((p) => Math.max(p - 1, 1))}
+                        disabled={chapterPage === 1}
                         className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
                         ← Previous
                       </button>
 
-                      {Array.from({ length: totalTopicPages }, (_, i) => i + 1).map((pageNum) => (
+                      {Array.from({ length: totalChapterPages }, (_, i) => i + 1).map((pageNum) => (
                         <button
                           key={pageNum}
                           type="button"
-                          onClick={() => setTopicPage(pageNum)}
+                          onClick={() => setChapterPage(pageNum)}
                           className={`w-8 h-8 text-xs font-bold rounded-lg transition-colors ${
-                            topicPage === pageNum
+                            chapterPage === pageNum
                               ? 'bg-orange-500 text-white shadow-sm'
                               : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-100'
                           }`}
@@ -411,8 +411,8 @@ export default function QuestionBank({ tab, onTabChange }) {
 
                       <button
                         type="button"
-                        onClick={() => setTopicPage((p) => Math.min(p + 1, totalTopicPages))}
-                        disabled={topicPage === totalTopicPages}
+                        onClick={() => setChapterPage((p) => Math.min(p + 1, totalChapterPages))}
+                        disabled={chapterPage === totalChapterPages}
                         className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
                         Next →
@@ -445,17 +445,17 @@ export default function QuestionBank({ tab, onTabChange }) {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Topic Area *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Chapter *</label>
                 <select
                   value={qForm.topic}
                   onChange={(e) => setQForm((prev) => ({ ...prev, topic: e.target.value }))}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
                 >
-                  <option value="">Select topic</option>
+                  <option value="">Select chapter</option>
                   {topics.map((t) => {
-                    const topicTitle = t.name || t.title
+                    const chapterTitle = t.name || t.title
                     return (
-                      <option key={t._id || t.id || topicTitle} value={topicTitle}>{topicTitle}</option>
+                      <option key={t._id || t.id || chapterTitle} value={chapterTitle}>{chapterTitle}</option>
                     )
                   })}
                 </select>
@@ -512,7 +512,7 @@ export default function QuestionBank({ tab, onTabChange }) {
                         name="correctAnswerOption"
                         checked={qForm.correctOptionIndex === i}
                         onChange={() => setQForm((prev) => ({ ...prev, correctOptionIndex: i }))}
-                        className="accent-orange-500 h-4 w-4"
+                        className="accent-orange-500 h-4 w-4 cursor-pointer"
                         title={`Select Option ${letter} as correct answer`}
                       />
                       <div className="flex-1">
@@ -541,7 +541,7 @@ export default function QuestionBank({ tab, onTabChange }) {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={saveQuestion}
-                className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
+                className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm cursor-pointer"
               >
                 {editingId ? 'Update Question' : 'Save Question'}
               </button>
@@ -551,7 +551,7 @@ export default function QuestionBank({ tab, onTabChange }) {
                   setQForm({ technology: '', topic: '', difficulty: 'Easy', type: 'Objective', questionText: '', options: ['', '', '', ''], correctOptionIndex: 0 })
                   onTabChange('list-questions')
                 }}
-                className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors"
+                className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -582,7 +582,7 @@ export default function QuestionBank({ tab, onTabChange }) {
               </div>
 
               <div className="flex-1 min-w-[140px]">
-                <label className="block text-xs font-medium text-gray-500 mb-1">Topic</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Chapter</label>
                 <select
                   value={topicFilter}
                   onChange={(e) => {
@@ -591,11 +591,11 @@ export default function QuestionBank({ tab, onTabChange }) {
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-400 outline-none"
                 >
-                  <option value="">All Topics</option>
+                  <option value="">All Chapters</option>
                   {topics.map((t) => {
-                    const topicTitle = t.name || t.title
+                    const chapterTitle = t.name || t.title
                     return (
-                      <option key={t._id || t.id || topicTitle} value={topicTitle}>{topicTitle}</option>
+                      <option key={t._id || t.id || chapterTitle} value={chapterTitle}>{chapterTitle}</option>
                     )
                   })}
                 </select>
@@ -638,7 +638,7 @@ export default function QuestionBank({ tab, onTabChange }) {
                   setQForm({ technology: '', topic: '', difficulty: 'Easy', type: 'Objective', questionText: '', options: ['', '', '', ''], correctOptionIndex: 0 })
                   onTabChange('add-question')
                 }}
-                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm self-end whitespace-nowrap"
+                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm self-end whitespace-nowrap cursor-pointer"
               >
                 + Add Question
               </button>
@@ -664,7 +664,7 @@ export default function QuestionBank({ tab, onTabChange }) {
                         <th className="text-left px-5 py-3 font-semibold text-gray-600 w-12">SL No</th>
                         <th className="text-left px-5 py-3 font-semibold text-gray-600">Question</th>
                         <th className="text-left px-5 py-3 font-semibold text-gray-600">Technology</th>
-                        <th className="text-left px-5 py-3 font-semibold text-gray-600">Topic</th>
+                        <th className="text-left px-5 py-3 font-semibold text-gray-600">Chapter</th>
                         <th className="text-left px-5 py-3 font-semibold text-gray-600">Difficulty</th>
                         <th className="text-left px-5 py-3 font-semibold text-gray-600">Type</th>
                         <th className="text-left px-5 py-3 font-semibold text-gray-600">Actions</th>
@@ -768,8 +768,8 @@ export default function QuestionBank({ tab, onTabChange }) {
         </div>
       )}
 
-      {/* Delete Topic Confirmation Modal */}
-      {deleteTopicModal && (
+      {/* Delete Chapter Confirmation Modal */}
+      {deleteChapterModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4 animate-scaleUp space-y-4">
             <div className="flex items-center gap-3">
@@ -777,36 +777,36 @@ export default function QuestionBank({ tab, onTabChange }) {
                 🗑️
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Confirm Topic Deletion</h3>
-                <p className="text-xs text-gray-500">Topic: {deleteTopicModal.name || deleteTopicModal.title}</p>
+                <h3 className="text-lg font-bold text-gray-900">Confirm Chapter Deletion</h3>
+                <p className="text-xs text-gray-500">Chapter: {deleteChapterModal.name || deleteChapterModal.title}</p>
               </div>
             </div>
 
             <p className="text-sm text-gray-600 leading-relaxed">
-              Are you sure you want to delete the topic <strong className="text-gray-900">"{deleteTopicModal.name || deleteTopicModal.title}"</strong>?
+              Are you sure you want to delete the chapter <strong className="text-gray-900">"{deleteChapterModal.name || deleteChapterModal.title}"</strong>?
             </p>
 
             {associatedQuestionsCount > 0 && (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-1">
                 <span className="font-bold block">⚠️ Associated Questions:</span>
-                <span>There are <strong>{associatedQuestionsCount}</strong> question(s) in the Question Bank currently categorized under this topic.</span>
+                <span>There are <strong>{associatedQuestionsCount}</strong> question(s) in the Question Bank currently categorized under this chapter.</span>
               </div>
             )}
 
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setDeleteTopicModal(null)}
+                onClick={() => setDeleteChapterModal(null)}
                 className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleConfirmDeleteTopic}
+                onClick={handleConfirmDeleteChapter}
                 className="px-5 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
               >
-                Yes, Delete Topic
+                Yes, Delete Chapter
               </button>
             </div>
           </div>
@@ -823,7 +823,7 @@ export default function QuestionBank({ tab, onTabChange }) {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Confirm Question Deletion</h3>
-                <p className="text-xs text-gray-500">Topic: {deleteQuestionModal.topic}</p>
+                <p className="text-xs text-gray-500">Chapter: {deleteQuestionModal.topic}</p>
               </div>
             </div>
 

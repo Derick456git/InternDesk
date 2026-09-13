@@ -10,8 +10,8 @@ const menuItems = [
   ]},
   { id: 'daily-notes', label: 'List Daily Notes', disabled: false },
   { id: 'question-bank', label: 'Question Bank', disabled: false, nested: true, subItems: [
-    { key: 'add-topics', label: 'Add Topics' },
-    { key: 'list-topics', label: 'List Topics' },
+    { key: 'add-chapters', label: 'Add Chapters' },
+    { key: 'list-chapters', label: 'List Chapters' },
     { key: 'add-question', label: 'Add Question' },
     { key: 'list-questions', label: 'List Questions' },
   ]},

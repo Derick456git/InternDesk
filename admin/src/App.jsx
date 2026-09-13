@@ -39,7 +39,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [subTabs, setSubTabs] = useState({
     syllabus: 'create',
-    'question-bank': 'add-topics',
+    'question-bank': 'add-chapters',
     'assign-test': 'add-test',
     'task-management': 'assign-task',
   })

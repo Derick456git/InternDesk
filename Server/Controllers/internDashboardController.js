@@ -5,6 +5,7 @@ const SyllabusAssignment = require('../Models/syllabusAssignmentModel')
 const DailyNote = require('../Models/dailyNoteModel')
 const Task = require('../Models/taskModel')
 const TestSubmission = require('../Models/testSubmissionModel')
+const { getWorkingEndDate, formatDateGB, formatDateWithDay } = require('../utils/dateUtils')
 
 const TEST_INTERVAL_DAYS = 5
 
@@ -118,6 +119,17 @@ exports.getDashboard = async (req, res) => {
       totalCompletedTests += techSubmissions.length
       totalPendingAssessments += techPendingAssessments
 
+      let startDate = assignment?.startDate || null
+      let endDate = null
+      let startDateFormatted = ''
+      let endDateFormatted = ''
+
+      if (startDate) {
+        endDate = getWorkingEndDate(startDate, requiredDays)
+        startDateFormatted = formatDateGB(startDate)
+        endDateFormatted = formatDateGB(endDate)
+      }
+
       technologyCards.push({
         technology,
         requiredDays,
@@ -127,6 +139,11 @@ exports.getDashboard = async (req, res) => {
         totalTests: techTotalTests,
         completedTests: techSubmissions.length,
         pendingAssessments: techPendingAssessments,
+        startDate,
+        endDate,
+        startDateFormatted,
+        endDateFormatted,
+        syllabusName: assignment?.syllabusName || '',
       })
     }
 

@@ -121,6 +121,15 @@ export default function AssignSyllabus() {
     return value < today
   }
 
+  const isWeekend = (dateStr) => {
+    if (!dateStr) return false
+    const [y, m, d] = dateStr.split('-').map(Number)
+    if (!y || !m || !d) return false
+    const date = new Date(y, m - 1, d)
+    const day = date.getDay()
+    return day === 0 || day === 6 // 0 = Sunday, 6 = Saturday
+  }
+
   const toggleIntern = (id) => {
     setSelectedInterns((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -139,6 +148,13 @@ export default function AssignSyllabus() {
     }
     if (isPastDate(startDate)) {
       setModalAlert({ type: 'error', message: 'Start date cannot be in the past.' })
+      return
+    }
+    if (isWeekend(startDate)) {
+      setModalAlert({
+        type: 'error',
+        message: 'Start date cannot be on a weekend (Saturday or Sunday). Please select a working day (Monday to Friday).',
+      })
       return
     }
     setAssigning(true)
@@ -366,16 +382,28 @@ export default function AssignSyllabus() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Syllabus Start Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Syllabus Start Date <span className="text-xs text-orange-600 font-semibold">(Monday – Friday only)</span>
+                </label>
                 <input
                   type="date"
                   value={startDate}
                   min={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition"
+                  className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none transition ${
+                    isWeekend(startDate)
+                      ? 'border-red-400 bg-red-50 text-red-700 focus:ring-2 focus:ring-red-400'
+                      : 'border-gray-300 focus:ring-2 focus:ring-orange-400 focus:border-orange-400'
+                  }`}
                 />
-                {isPastDate(startDate) && (
+                {isPastDate(startDate) ? (
                   <p className="text-xs text-red-500 mt-1">Start date cannot be in the past.</p>
+                ) : isWeekend(startDate) ? (
+                  <p className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
+                    <span>⚠️</span> Weekends (Saturday & Sunday) are holidays. Please pick a working day (Monday – Friday).
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-1">Working days are calculated starting from this date, skipping weekends.</p>
                 )}
               </div>
 
@@ -420,7 +448,7 @@ export default function AssignSyllabus() {
               <button
                 type="button"
                 onClick={handleAssign}
-                disabled={assigning || selectedInterns.length === 0 || isPastDate(startDate)}
+                disabled={assigning || selectedInterns.length === 0 || isPastDate(startDate) || isWeekend(startDate)}
                 className="px-4 py-2 text-sm font-medium text-white bg-orange-500 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {assigning ? 'Assigning...' : `Assign${selectedInterns.length ? ` (${selectedInterns.length})` : ''}`}

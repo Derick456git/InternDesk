@@ -5,6 +5,7 @@ const Notification = require('../Models/notificationModel')
 const TestSubmission = require('../Models/testSubmissionModel')
 const { uploadToCloudinary } = require('../utils/cloudinaryUpload')
 const { sendDailyNotesFeedbackEmail, sendAdminNotesSubmissionEmail } = require('../config/mailer')
+const { isWeekend, getWorkingDateForDay, formatDateWithDay } = require('../utils/dateUtils')
 
 const resolveRegistration = async (email) => {
   return Registration.findOne({ email: email.toLowerCase() }).sort({ createdAt: -1 })
@@ -31,6 +32,15 @@ exports.createDailyNote = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Technology and a valid day are required.' })
     }
 
+    // Weekend check: Interns cannot upload notes on Saturday or Sunday
+    const today = new Date()
+    if (isWeekend(today)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Daily notes cannot be uploaded on weekends (Saturday or Sunday). Uploads are only permitted on working days (Monday – Friday).',
+      })
+    }
+
     const registration = await resolveRegistration(req.intern.email)
     if (!registration) {
       return res.status(404).json({ success: false, message: 'Intern record not found.' })
@@ -48,6 +58,24 @@ exports.createDailyNote = async (req, res) => {
     const maxDay = extractDurationDays(assignment.syllabusName)
     if (maxDay !== null && (day < 1 || day > maxDay)) {
       return res.status(400).json({ success: false, message: `Day must be between 1 and ${maxDay} for this syllabus.` })
+    }
+
+    // Date restriction check: Day k can only be uploaded on or after its calculated working calendar date
+    if (assignment.startDate) {
+      const scheduledDate = getWorkingDateForDay(assignment.startDate, day)
+      if (scheduledDate) {
+        const todayMidnight = new Date()
+        todayMidnight.setHours(0, 0, 0, 0)
+        const targetMidnight = new Date(scheduledDate)
+        targetMidnight.setHours(0, 0, 0, 0)
+
+        if (todayMidnight < targetMidnight) {
+          return res.status(400).json({
+            success: false,
+            message: `Day ${day} notes cannot be uploaded today. Day ${day} is scheduled for ${formatDateWithDay(scheduledDate)}. Daily notes can only be uploaded on or after their scheduled working date.`,
+          })
+        }
+      }
     }
 
     // Check if already submitted

@@ -673,7 +673,7 @@ export default function AssignTest({ tab, onTabChange }) {
                 <div className="flex-1 relative">
                   <input
                     type="text"
-                    placeholder="Search question text or topic..."
+                    placeholder="Search question text or chapter..."
                     value={modalSearch}
                     onChange={(e) => setModalSearch(e.target.value)}
                     className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-orange-400 bg-white"

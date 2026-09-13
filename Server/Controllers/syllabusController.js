@@ -272,6 +272,13 @@ exports.assign = async (req, res) => {
     if (start < today) {
       return res.status(400).json({ success: false, message: 'Start date cannot be in the past.' })
     }
+    const dayOfWeek = start.getDay()
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Start date cannot be on a weekend (Saturday or Sunday). Please select a working day (Monday to Friday).',
+      })
+    }
 
     const registrations = await Registration.find({ _id: { $in: ids } })
     const internDocs = await Intern.find({ _id: { $in: ids } })

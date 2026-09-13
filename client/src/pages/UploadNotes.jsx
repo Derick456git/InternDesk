@@ -8,6 +8,66 @@ const extractDurationDays = (syllabusName) => {
   return match ? parseInt(match[1], 10) : 0
 }
 
+const isWeekend = (dateObj) => {
+  if (!dateObj) return false
+  const d = new Date(dateObj)
+  if (isNaN(d.getTime())) return false
+  const day = d.getDay()
+  return day === 0 || day === 6 // 0 = Sun, 6 = Sat
+}
+
+const getWorkingDateForDay = (startDateStr, dayNumber) => {
+  if (!startDateStr || !dayNumber) return null
+  const start = new Date(startDateStr)
+  if (isNaN(start.getTime())) return null
+  start.setHours(0, 0, 0, 0)
+
+  // Skip weekend if startDate was on weekend
+  while (start.getDay() === 0 || start.getDay() === 6) {
+    start.setDate(start.getDate() + 1)
+  }
+
+  const dayNum = Number(dayNumber)
+  if (dayNum <= 1) return start
+
+  let current = new Date(start)
+  let workingDaysCount = 1
+
+  while (workingDaysCount < dayNum) {
+    current.setDate(current.getDate() + 1)
+    const dayOfWeek = current.getDay()
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      workingDaysCount++
+    }
+  }
+
+  return current
+}
+
+const getWorkingEndDate = (startDateStr, totalWorkingDays) => {
+  return getWorkingDateForDay(startDateStr, totalWorkingDays || 30)
+}
+
+const formatDateGB = (dateObj) => {
+  if (!dateObj) return ''
+  const d = new Date(dateObj)
+  if (isNaN(d.getTime())) return ''
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
+const formatDateWithDay = (dateObj) => {
+  if (!dateObj) return ''
+  const d = new Date(dateObj)
+  if (isNaN(d.getTime())) return ''
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const gb = formatDateGB(d)
+  const dayName = weekdays[d.getDay()]
+  return `${gb} (${dayName})`
+}
+
 export default function UploadNotes({ onNavigate }) {
   const navigate = useNavigate()
   const [assignments, setAssignments] = useState([])
@@ -131,6 +191,27 @@ export default function UploadNotes({ onNavigate }) {
     return { isLocked: false }
   }
 
+  // Check if a day is in the future relative to today's working calendar
+  const getFutureDayStatus = (assignment, day) => {
+    if (!assignment?.startDate || !day) return { isFuture: false }
+    const scheduledDate = getWorkingDateForDay(assignment.startDate, day)
+    if (!scheduledDate) return { isFuture: false }
+
+    const todayMidnight = new Date()
+    todayMidnight.setHours(0, 0, 0, 0)
+    const targetMidnight = new Date(scheduledDate)
+    targetMidnight.setHours(0, 0, 0, 0)
+
+    if (todayMidnight < targetMidnight) {
+      return {
+        isFuture: true,
+        scheduledDate,
+        reason: `Day ${day} is scheduled for ${formatDateWithDay(scheduledDate)}. It will unlock on that working day.`,
+      }
+    }
+    return { isFuture: false, scheduledDate }
+  }
+
   // Find if current technology has any active unlocked test blocking subsequent days
   const getActiveBlockingAssessment = (tech) => {
     if (!tech) return null
@@ -163,6 +244,7 @@ export default function UploadNotes({ onNavigate }) {
   }
 
   const activeBlockingAssessment = technology ? getActiveBlockingAssessment(technology) : null
+  const isTodayWeekend = isWeekend(new Date())
 
   const checkEligibility = (tech, day, allSubs) => {
     const subDays = allSubs.filter((s) => s.technology === tech).map((s) => s.dayNumber)
@@ -180,8 +262,23 @@ export default function UploadNotes({ onNavigate }) {
     setAlert({ type: 'error', message: '' })
     setEligibilityAlert(null)
 
+    if (isTodayWeekend) {
+      return setAlert({
+        type: 'error',
+        message: 'Today is a weekend (Saturday/Sunday). Daily notes can only be uploaded on working days (Monday – Friday). Uploads will resume on Monday.',
+      })
+    }
+
     if (!technology) return setAlert({ type: 'error', message: 'Please select a technology.' })
     if (!dayNumber) return setAlert({ type: 'error', message: 'Please select a day.' })
+
+    const futureStatus = getFutureDayStatus(selectedAssignment, dayNumber)
+    if (futureStatus.isFuture) {
+      return setAlert({
+        type: 'error',
+        message: futureStatus.reason || `Day ${dayNumber} notes cannot be uploaded before its scheduled date.`,
+      })
+    }
 
     const seqStatus = getSequentialDayStatus(technology, dayNumber)
     if (seqStatus.isLocked) {
@@ -258,7 +355,7 @@ export default function UploadNotes({ onNavigate }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Upload Notes</h2>
-          <p className="text-sm text-gray-500 mt-1">Upload your daily note (.docx) and book (.xlsx) for each assigned day.</p>
+          <p className="text-sm text-gray-500 mt-1">Upload your daily note (.docx) and book (.xlsx) for each assigned working day (Monday – Friday).</p>
         </div>
 
         {/* Static Template Download Actions */}
@@ -292,6 +389,18 @@ export default function UploadNotes({ onNavigate }) {
           message={alert.message}
           onClose={() => setAlert({ type: 'error', message: '' })}
         />
+
+        {isTodayWeekend && (
+          <div className="mb-4 p-4 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-3 animate-fadeIn">
+            <span className="text-xl">🏖️</span>
+            <div>
+              <h4 className="text-sm font-bold text-blue-900">Weekend Holiday (Saturday / Sunday)</h4>
+              <p className="text-xs text-blue-700 mt-0.5">
+                Note uploading is paused during weekends. Submissions are strictly accepted on working days (Monday to Friday). Uploading will unlock on Monday.
+              </p>
+            </div>
+          </div>
+        )}
 
         {!activeBlockingAssessment && eligibilityAlert && (
           <div className="mb-4 p-4 rounded-xl bg-green-50 border border-green-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
@@ -361,6 +470,27 @@ export default function UploadNotes({ onNavigate }) {
           />
         ) : (
           <form onSubmit={handleOpenConfirm} className="space-y-5 mt-2">
+            {selectedAssignment && (
+              <div className="p-4 bg-orange-50/80 border border-orange-200 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs animate-fadeIn">
+                <div>
+                  <span className="text-gray-500 font-medium block">Assigned Syllabus Track</span>
+                  <strong className="text-gray-800 text-sm">{selectedAssignment.syllabusName}</strong>
+                </div>
+                <div>
+                  <span className="text-gray-500 font-medium block">Duration Schedule</span>
+                  <strong className="text-gray-800 text-sm">
+                    {selectedAssignment.startDate
+                      ? `${formatDateWithDay(selectedAssignment.startDate)} – ${formatDateWithDay(getWorkingEndDate(selectedAssignment.startDate, durationDays))}`
+                      : 'Schedule pending'}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-gray-500 font-medium block">Working Days Timeline</span>
+                  <strong className="text-orange-700 text-sm">{durationDays} Days (Monday–Friday)</strong>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Technology</label>
@@ -372,11 +502,6 @@ export default function UploadNotes({ onNavigate }) {
                   <option value="">Select Technology</option>
                   {technologies.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
-                {selectedAssignment && (
-                  <p className="text-xs text-gray-400 mt-1.5">
-                    Assigned syllabus: {selectedAssignment.syllabusName} ({durationDays} days)
-                  </p>
-                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Day</label>
@@ -391,7 +516,11 @@ export default function UploadNotes({ onNavigate }) {
                     const isAlreadySubmitted = submissionKeys.has(technology + '-' + day)
                     const seqStatus = getSequentialDayStatus(technology, day)
                     const lockStatus = getDayLockStatus(technology, day)
-                    const isLocked = isAlreadySubmitted || seqStatus.isLocked || lockStatus.isLocked
+                    const futureStatus = getFutureDayStatus(selectedAssignment, day)
+                    const scheduledDate = futureStatus.scheduledDate || getWorkingDateForDay(selectedAssignment?.startDate, day)
+                    const formattedDayDate = scheduledDate ? formatDateWithDay(scheduledDate) : ''
+
+                    const isLocked = isAlreadySubmitted || futureStatus.isFuture || seqStatus.isLocked || lockStatus.isLocked
 
                     return (
                       <option
@@ -399,9 +528,11 @@ export default function UploadNotes({ onNavigate }) {
                         value={day}
                         disabled={isLocked}
                       >
-                        Day {day}
+                        Day {day} {formattedDayDate ? `· ${formattedDayDate}` : ''}
                         {isAlreadySubmitted
                           ? ' (Submitted)'
+                          : futureStatus.isFuture
+                          ? ` (Locked - Unlocks on ${formattedDayDate})`
                           : seqStatus.isLocked
                           ? ` (Locked - Submit Day ${seqStatus.missingDay} first)`
                           : lockStatus.isLocked
