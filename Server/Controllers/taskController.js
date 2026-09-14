@@ -1,42 +1,8 @@
 const Task = require('../Models/taskModel')
 const Registration = require('../Models/registrationModel')
 const Notification = require('../Models/notificationModel')
-const cloudinary = require('../config/cloudinary')
-const { uploadToCloudinary } = require('../utils/cloudinaryUpload')
 const { sendTaskAssignedEmail, sendTaskReviewedEmail, sendAdminTaskSubmissionEmail } = require('../config/mailer')
-
-/**
- * Generates an authenticated Cloudinary download URL for raw files (e.g. .zip)
- * Bypasses public CDN 401 restrictions by signing with API credentials.
- */
-const generateSignedZipUrl = (task) => {
-  const rawUrl = task.zipFileUrl || task.zipFile || ''
-  if (!rawUrl) return ''
-
-  // Extract Cloudinary publicId
-  let publicId = task.cloudinaryPublicId
-  if (!publicId && rawUrl.includes('cloudinary.com')) {
-    const parts = rawUrl.split('/upload/')
-    if (parts[1]) {
-      publicId = parts[1].replace(/^v\d+\//, '').replace(/^s--[^/]+--\//, '').replace(/^fl_[^/]+\//, '')
-    }
-  }
-
-  if (publicId && rawUrl.includes('cloudinary.com')) {
-    try {
-      return cloudinary.utils.private_download_url(publicId, 'zip', {
-        resource_type: 'raw',
-        type: 'upload',
-        attachment: true,
-        expires_at: Math.floor(Date.now() / 1000) + 86400, // 24 hours validity
-      })
-    } catch (e) {
-      console.error('Cloudinary signed URL error:', e.message)
-    }
-  }
-
-  return rawUrl
-}
+const { withRetry } = require('../utils/dbRetry')
 
 exports.getAll = async (req, res) => {
   try {
@@ -46,21 +12,21 @@ exports.getAll = async (req, res) => {
     if (email) filter.internEmail = email.toLowerCase()
     if (status && status !== 'All') filter.status = status
 
-    const tasks = await Task.find(filter).sort({ createdAt: -1 }).lean()
+    const tasks = await withRetry(() => Task.find(filter).sort({ createdAt: -1 }).lean())
 
     const isInternReq = req.intern && (!req.user || req.user.role !== 'admin')
     const sanitized = tasks.map((t) => {
-      const signedZipUrl = generateSignedZipUrl(t)
       const resObj = {
         ...t,
-        zipFileUrl: signedZipUrl || t.zipFileUrl,
-        zipFile: signedZipUrl || t.zipFile,
+        driveLink: t.driveLink || '',
+        status: t.status || (t.reviewStatus === 'Completed' ? 'Approved' : t.reviewStatus || 'Pending'),
       }
 
       if (isInternReq && !t.isPublished) {
         resObj.feedback = ''
         resObj.adminFeedback = ''
         resObj.marks = null
+        resObj.feedbackMark = ''
       }
       return resObj
     })
@@ -84,14 +50,14 @@ exports.create = async (req, res) => {
     let resolvedEmail = internEmail
     let regId = assignedInternId
     if (!resolvedEmail || !regId) {
-      const reg = await Registration.findOne({ name: intern, status: 'Approved' }).sort({ createdAt: -1 })
+      const reg = await withRetry(() => Registration.findOne({ name: intern, status: 'Approved' }).sort({ createdAt: -1 }))
       if (reg) {
         resolvedEmail = reg.email
         regId = reg._id
       }
     }
 
-    const task = await Task.create({
+    const task = await withRetry(() => Task.create({
       taskName: name,
       title: name,
       taskDescription: desc,
@@ -103,8 +69,9 @@ exports.create = async (req, res) => {
       dueDate: new Date(dueDate),
       status: 'Pending',
       submissionStatus: 'pending',
+      reviewStatus: 'Pending',
       isPublished: false,
-    })
+    }))
 
     if (resolvedEmail) {
       try {
@@ -120,14 +87,14 @@ exports.create = async (req, res) => {
       }
 
       try {
-        await Notification.create({
+        await withRetry(() => Notification.create({
           recipientId: regId || null,
           email: resolvedEmail,
           internName: intern,
           title: `New Task Assigned: ${name}`,
           message: `Practical task "${name}" for ${technology} has been assigned. Due Date: ${new Date(dueDate).toLocaleDateString('en-GB')}.`,
           type: 'task_assigned',
-        })
+        }))
       } catch (e) {
         console.error('Task notification error:', e.message)
       }
@@ -139,62 +106,95 @@ exports.create = async (req, res) => {
   }
 }
 
-exports.submitZip = async (req, res) => {
+/**
+ * Submit / Re-upload Google Drive link for Practical Task
+ */
+exports.submitLink = async (req, res) => {
   try {
     const { id } = req.params
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Please upload a .zip project file.' })
+    const { driveLink } = req.body
+
+    let trimmedLink = (driveLink || '').trim()
+    if (!trimmedLink) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid Google Drive shareable link.' })
     }
 
-    const task = await Task.findById(id)
+    // Ensure absolute URL
+    if (!trimmedLink.startsWith('http://') && !trimmedLink.startsWith('https://')) {
+      trimmedLink = `https://${trimmedLink}`
+    }
+
+    const task = await withRetry(() => Task.findById(id))
     if (!task) {
       return res.status(404).json({ success: false, message: 'Task not found.' })
     }
 
-    const upload = await uploadToCloudinary(req.file.buffer, {
-      folder: 'intern-desk/tasks',
-      resource_type: 'raw',
-      originalname: req.file.originalname || `task_${task._id}.zip`,
-    })
+    const isAlreadyApproved = task.status === 'Approved' || task.reviewStatus === 'Completed'
+    if (isAlreadyApproved) {
+      return res.status(400).json({ success: false, message: 'This practical task has already been approved.' })
+    }
 
-    task.zipFile = upload.secure_url
-    task.zipFileUrl = upload.secure_url
-    task.cloudinaryPublicId = upload.public_id
-    task.submissionStatus = 'submitted'
-    task.status = 'Completed'
-    task.submittedAt = new Date()
-    await task.save()
+    const isReupload = task.status === 'Rejected' || task.reviewStatus === 'Rejected' || Boolean(task.driveLink)
 
-    const signedUrl = generateSignedZipUrl(task)
+    const updatedTask = await withRetry(() => Task.findByIdAndUpdate(
+      id,
+      {
+        driveLink: trimmedLink,
+        submissionStatus: 'submitted',
+        status: 'Pending',
+        reviewStatus: 'Pending',
+        submittedAt: new Date(),
+        submissionDate: new Date(),
+        adminFeedback: '',
+        feedback: '',
+        feedbackMark: 'Pending',
+        isPublished: false,
+        reviewed: false,
+        isReupload: Boolean(isReupload),
+      },
+      { new: true }
+    ))
+
+    if (!updatedTask) {
+      return res.status(404).json({ success: false, message: 'Task not found during update.' })
+    }
 
     // Notify Admin via In-App Notification and Email Alert
     try {
-      await Notification.create({
+      await withRetry(() => Notification.create({
         recipientRole: 'admin',
-        internName: task.intern || 'Intern',
-        internEmail: task.internEmail || '',
-        technology: task.technology || 'General',
-        title: `Task Submitted: ${task.intern || 'Intern'} (${task.taskName || task.title})`,
-        message: `${task.intern || 'Intern'} uploaded a completed project ZIP for practical task "${task.taskName || task.title}" (${task.technology}).`,
+        internName: updatedTask.intern || 'Intern',
+        internEmail: updatedTask.internEmail || '',
+        technology: updatedTask.technology || 'General',
+        title: isReupload
+          ? `Practical Task Re-uploaded: ${updatedTask.intern || 'Intern'} (${updatedTask.taskName || updatedTask.title})`
+          : `Practical Task Submitted: ${updatedTask.intern || 'Intern'} (${updatedTask.taskName || updatedTask.title})`,
+        message: isReupload
+          ? `${updatedTask.intern || 'Intern'} re-uploaded the Google Drive project link for practical task "${updatedTask.taskName || updatedTask.title}" (${updatedTask.technology}).`
+          : `${updatedTask.intern || 'Intern'} submitted the Google Drive project link for practical task "${updatedTask.taskName || updatedTask.title}" (${updatedTask.technology}).`,
         type: 'task_submitted',
-        referenceId: task._id,
+        referenceId: updatedTask._id,
         meta: {
-          taskId: task._id,
-          taskName: task.taskName || task.title,
-          technology: task.technology,
-          internEmail: task.internEmail,
+          taskId: updatedTask._id,
+          taskName: updatedTask.taskName || updatedTask.title,
+          technology: updatedTask.technology,
+          internEmail: updatedTask.internEmail,
+          driveLink: trimmedLink,
+          isReupload: Boolean(isReupload),
         },
-      })
+      }))
     } catch (notifErr) {
       console.error('Failed to create admin task notification:', notifErr.message)
     }
 
     try {
       await sendAdminTaskSubmissionEmail({
-        internName: task.intern || 'Intern',
-        internEmail: task.internEmail || '',
-        technology: task.technology || 'General',
-        taskName: task.taskName || task.title,
+        internName: updatedTask.intern || 'Intern',
+        internEmail: updatedTask.internEmail || '',
+        technology: updatedTask.technology || 'General',
+        taskName: updatedTask.taskName || updatedTask.title,
+        driveLink: trimmedLink,
+        isReupload: Boolean(isReupload),
         submittedAt: new Date(),
       })
     } catch (emailErr) {
@@ -203,36 +203,14 @@ exports.submitZip = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Practical task .zip uploaded successfully to Cloudinary.',
-      data: {
-        ...task.toObject(),
-        zipFileUrl: signedUrl,
-        zipFile: signedUrl,
-      },
+      message: isReupload
+        ? 'Practical task Google Drive link re-uploaded successfully for admin review.'
+        : 'Practical task Google Drive link submitted successfully.',
+      data: updatedTask,
     })
   } catch (error) {
-    console.error('Task zip upload error:', error)
-    res.status(500).json({ success: false, message: error.message || 'Failed to upload task ZIP file.' })
-  }
-}
-
-exports.downloadZip = async (req, res) => {
-  try {
-    const { id } = req.params
-    const task = await Task.findById(id)
-    if (!task || (!task.zipFileUrl && !task.zipFile)) {
-      return res.status(404).send('ZIP project file not found for this task.')
-    }
-
-    const signedUrl = generateSignedZipUrl(task)
-    if (signedUrl) {
-      return res.redirect(signedUrl)
-    }
-
-    return res.status(404).send('File URL is invalid.')
-  } catch (err) {
-    console.error('Download ZIP error:', err)
-    res.status(500).send('Error downloading ZIP file.')
+    console.error('Task link submission error:', error)
+    res.status(500).json({ success: false, message: error.message || 'Failed to submit task link.' })
   }
 }
 
@@ -240,7 +218,7 @@ exports.updateStatus = async (req, res) => {
   try {
     const { id } = req.params
     const { status } = req.body
-    if (!['Pending', 'Completed', 'Not Done', 'Partially Done'].includes(status)) {
+    if (!['Pending', 'Approved', 'Rejected', 'Completed', 'Not Done', 'Partially Done'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Invalid status' })
     }
     const task = await Task.findByIdAndUpdate(id, { status }, { new: true })
@@ -253,56 +231,71 @@ exports.updateStatus = async (req, res) => {
   }
 }
 
+/**
+ * Send Feedback & Evaluation for Practical Task (matches Evaluate Daily Notes format)
+ */
 exports.sendFeedback = async (req, res) => {
   try {
     const { id } = req.params
-    const { feedback, marks, isPublished } = req.body
+    const { score, marks, feedback, status } = req.body
 
-    const shouldPublish = isPublished !== undefined ? Boolean(isPublished) : true
+    const rawScore = score !== undefined && score !== null && score !== '' ? score : marks
+    if (rawScore === undefined || rawScore === null || rawScore === '') {
+      return res.status(400).json({ success: false, message: 'Please enter a valid mark (0-10) for the task.' })
+    }
+
+    const numericScore = Number(rawScore)
+    if (isNaN(numericScore) || numericScore < 0 || numericScore > 10) {
+      return res.status(400).json({ success: false, message: 'Marks must be a valid number between 0 and 10.' })
+    }
+
+    const finalStatus = status && ['Approved', 'Rejected'].includes(status)
+      ? status
+      : (numericScore >= 5 ? 'Approved' : 'Rejected')
+
     const updateData = {
-      feedback: feedback || '',
-      adminFeedback: feedback || '',
+      marks: numericScore,
+      feedbackMark: `${numericScore}/10`,
+      feedback: (feedback || '').trim(),
+      adminFeedback: (feedback || '').trim(),
+      status: finalStatus,
+      reviewStatus: finalStatus === 'Approved' ? 'Completed' : 'Rejected',
       reviewed: true,
-      feedbackSent: shouldPublish,
+      feedbackSent: true,
       submissionStatus: 'reviewed',
-      isPublished: shouldPublish,
+      isPublished: true,
     }
 
-    if (marks !== undefined && marks !== null && marks !== '') {
-      const numMarks = Number(marks)
-      if (isNaN(numMarks) || numMarks < 0 || numMarks > 10) {
-        return res.status(400).json({ success: false, message: 'Marks must be a valid number between 0 and 10.' })
-      }
-      updateData.marks = numMarks
-    }
-
-    const task = await Task.findByIdAndUpdate(id, updateData, { new: true })
+    const task = await withRetry(() => Task.findByIdAndUpdate(id, updateData, { new: true }))
     if (!task) {
       return res.status(404).json({ success: false, message: 'Task not found.' })
     }
 
-    if (shouldPublish && task.internEmail) {
+    // Send email to intern
+    if (task.internEmail) {
       try {
         await sendTaskReviewedEmail(task.internEmail, {
           internName: task.intern,
-          taskName: task.taskName,
-          marks: task.marks,
-          feedback: task.adminFeedback || task.feedback,
+          taskName: task.taskName || task.title,
+          marks: numericScore,
+          feedback: task.adminFeedback,
           technology: task.technology,
+          status: finalStatus,
+          driveLink: task.driveLink,
         })
       } catch (e) {
         console.error('Task review email error:', e.message)
       }
 
       try {
-        await Notification.create({
+        await withRetry(() => Notification.create({
           recipientId: task.assignedInternId || null,
           email: task.internEmail,
           internName: task.intern,
-          title: `Task Review Published: ${task.taskName}`,
-          message: `Your practical task "${task.taskName}" has been reviewed.${task.marks !== null ? ` Marks: ${task.marks}/10.` : ''}`,
+          title: `Practical Task ${task.taskName} ${finalStatus === 'Approved' ? 'Approved' : 'Revision Required'}`,
+          message: `Your practical task "${task.taskName}" for ${task.technology} was evaluated: ${numericScore}/10 (${finalStatus}).${task.adminFeedback ? ` Feedback: "${task.adminFeedback}"` : ''}`,
           type: 'task_reviewed',
-        })
+        }))
       } catch (e) {
         console.error('Notification error:', e.message)
       }
@@ -310,10 +303,11 @@ exports.sendFeedback = async (req, res) => {
 
     res.json({
       success: true,
-      message: shouldPublish ? 'Feedback and evaluation published to intern.' : 'Evaluation saved.',
+      message: `Feedback of ${numericScore}/10 (${finalStatus}) with written remarks sent successfully to ${task.intern}.`,
       data: task,
     })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }
 }
+

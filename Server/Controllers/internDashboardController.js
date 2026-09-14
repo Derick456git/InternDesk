@@ -164,6 +164,7 @@ exports.getDashboard = async (req, res) => {
       $or: internFilter.length ? internFilter : [{ internEmail: email }],
       submissionStatus: { $nin: ['submitted', 'reviewed'] },
       $and: [
+        { driveLink: { $in: ['', null] } },
         { zipFileUrl: { $in: ['', null] } },
         { zipFile: { $in: ['', null] } },
       ],

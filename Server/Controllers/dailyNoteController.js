@@ -6,9 +6,10 @@ const TestSubmission = require('../Models/testSubmissionModel')
 const { uploadToCloudinary } = require('../utils/cloudinaryUpload')
 const { sendDailyNotesFeedbackEmail, sendAdminNotesSubmissionEmail } = require('../config/mailer')
 const { isWeekend, getWorkingDateForDay, formatDateWithDay } = require('../utils/dateUtils')
+const { withRetry } = require('../utils/dbRetry')
 
 const resolveRegistration = async (email) => {
-  return Registration.findOne({ email: email.toLowerCase() }).sort({ createdAt: -1 })
+  return withRetry(() => Registration.findOne({ email: email.toLowerCase() }).sort({ createdAt: -1 }))
 }
 
 const extractDurationDays = (syllabusName) => {
@@ -46,11 +47,11 @@ exports.createDailyNote = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Intern record not found.' })
     }
 
-    const assignment = await SyllabusAssignment.findOne({
+    const assignment = await withRetry(() => SyllabusAssignment.findOne({
       internId: registration._id,
       technology,
       status: 'Active',
-    })
+    }))
     if (!assignment) {
       return res.status(403).json({ success: false, message: 'You do not have an active assignment for this technology.' })
     }
@@ -79,11 +80,11 @@ exports.createDailyNote = async (req, res) => {
     }
 
     // Check if already submitted
-    const existingSubmission = await DailyNote.findOne({
+    const existingSubmission = await withRetry(() => DailyNote.findOne({
       internId: registration._id,
       technology,
       dayNumber: day,
-    })
+    }))
 
     const isAlreadyApproved = existingSubmission && (
       existingSubmission.status === 'Approved' ||
@@ -108,11 +109,11 @@ exports.createDailyNote = async (req, res) => {
 
     // Sequential day check: Intern must upload notes sequentially (Day 1, Day 2, ..., Day N)
     if (day > 1 && !isReupload) {
-      const existingDays = await DailyNote.find({
+      const existingDays = await withRetry(() => DailyNote.find({
         internId: registration._id,
         technology,
         dayNumber: { $gte: 1, $lt: day },
-      }).select('dayNumber status').lean()
+      }).select('dayNumber status').lean())
 
       const submittedDaySet = new Set(existingDays.map((d) => d.dayNumber))
       for (let p = 1; p < day; p++) {
@@ -131,11 +132,11 @@ exports.createDailyNote = async (req, res) => {
       for (let m = 1; m <= prevTest; m++) {
         const startDay = (m - 1) * 5 + 1
         const endDay = m * 5
-        const testNotesCount = await DailyNote.countDocuments({
+        const testNotesCount = await withRetry(() => DailyNote.countDocuments({
           internId: registration._id,
           technology,
           dayNumber: { $gte: startDay, $lte: endDay },
-        })
+        }))
 
         if (testNotesCount < 5) {
           return res.status(403).json({
@@ -144,14 +145,14 @@ exports.createDailyNote = async (req, res) => {
           })
         }
 
-        const testSub = await TestSubmission.findOne({
+        const testSub = await withRetry(() => TestSubmission.findOne({
           email: registration.email.toLowerCase(),
           technology,
           $or: [
             { assessmentNumber: m },
             { testName: new RegExp(`Assessment\\s*${m}`, 'i') },
           ],
-        })
+        }))
 
         if (!testSub) {
           return res.status(403).json({
@@ -192,7 +193,7 @@ exports.createDailyNote = async (req, res) => {
       })
     }
 
-    const submission = await DailyNote.findOneAndUpdate(
+    const submission = await withRetry(() => DailyNote.findOneAndUpdate(
       { internId: registration._id, technology, dayNumber: day },
       {
         internId: registration._id,
@@ -211,11 +212,11 @@ exports.createDailyNote = async (req, res) => {
         adminFeedback: '',
       },
       { upsert: true, new: true }
-    )
+    ))
 
     // Notify Admin via In-App Notification and Email Alert
     try {
-      await Notification.create({
+      await withRetry(() => Notification.create({
         recipientRole: 'admin',
         internName: registration.name,
         internEmail: registration.email,
@@ -229,7 +230,7 @@ exports.createDailyNote = async (req, res) => {
         type: 'note_submitted',
         referenceId: submission._id,
         meta: { dayNumber: day, technology, internId: registration._id, submissionId: submission._id, isReupload: Boolean(isReupload) },
-      })
+      }))
     } catch (notifErr) {
       console.error('Failed to create admin note notification:', notifErr.message)
     }

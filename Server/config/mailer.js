@@ -248,26 +248,36 @@ exports.sendTaskAssignedEmail = async (to, { internName, taskName, technology, d
     from: `"Intern Desk Admin" <${process.env.EMAIL_USER}>`,
     to,
     subject,
-    text: `Dear ${internName},\n\nA new practical task "${taskName}" for ${technology} has been assigned to you.\nDue Date: ${due}\n\nDescription: ${taskDescription}\n\nLogin to Intern Portal: ${loginUrl}\n\nPlease submit your completed project as a .zip file through the Intern Portal.`,
+    text: `Dear ${internName},\n\nA new practical task "${taskName}" for ${technology} has been assigned to you.\nDue Date: ${due}\n\nDescription: ${taskDescription}\n\nInstructions:\n1. Complete your practical project code.\n2. Package your project into a .zip archive and upload it to your Google Drive.\n3. Make sure the Google Drive link sharing is set to 'Anyone with the link can view'.\n4. Copy and paste the shareable Google Drive link in the 'Tasks' module on your Intern Portal before the due date.\n\nLogin to Intern Portal: ${loginUrl}\n\n- Intern Desk Team`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto;">
-        <div style="background-color: #0f1a2e; padding: 20px; text-align: center;">
+      <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+        <div style="background-color: #0f1a2e; padding: 22px; text-align: center;">
           <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Intern Desk</h1>
-          <p style="color: #8899aa; margin: 4px 0 0; font-size: 12px;">Practical Task Assignment</p>
+          <p style="color: #f97316; margin: 4px 0 0; font-size: 12px; font-weight: bold;">Practical Task Assignment</p>
         </div>
-        <div style="padding: 24px; background-color: #ffffff; border: 1px solid #e5e7eb;">
+        <div style="padding: 24px; background-color: #ffffff;">
           <h2 style="margin: 0 0 12px; font-size: 16px; color: #1f2937;">${subject}</h2>
-          <p style="font-size: 14px; color: #4b5563; margin: 0 0 10px;">Dear ${internName},</p>
-          <p style="font-size: 14px; color: #4b5563; margin: 0 0 14px;">A new practical task has been assigned to your profile:</p>
-          <div style="padding: 16px; background-color: #f3f4f6; border-radius: 8px; margin-bottom: 14px;">
+          <p style="font-size: 14px; color: #4b5563; margin: 0 0 10px;">Dear <strong>${internName}</strong>,</p>
+          <p style="font-size: 14px; color: #4b5563; margin: 0 0 14px;">A new practical project task has been assigned to your profile:</p>
+          <div style="padding: 16px; background-color: #f8fafc; border-radius: 8px; border-left: 4px solid #f97316; margin-bottom: 14px;">
             <p style="margin: 0; font-size: 15px; font-weight: 700; color: #0f1a2e;">${taskName} (${technology})</p>
             <p style="margin: 4px 0 0; font-size: 13px; color: #6b7280;">Due Date: <strong>${due}</strong></p>
-            ${taskDescription ? `<p style="margin: 8px 0 0; font-size: 13px; color: #4b5563;">${taskDescription}</p>` : ''}
+            ${taskDescription ? `<p style="margin: 8px 0 0; font-size: 13px; color: #4b5563; line-height: 1.5;">${taskDescription}</p>` : ''}
           </div>
-          ${renderInternLoginButtonHtml('Login to View Task →')}
-          <p style="font-size: 13px; color: #4b5563; margin: 10px 0 0; text-align: center;">Complete your project and upload the .zip archive on your Intern Portal before the deadline.</p>
+
+          <div style="padding: 12px 14px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin-bottom: 14px; font-size: 12px; color: #166534; line-height: 1.6;">
+            <strong>📌 Submission Instructions:</strong>
+            <ol style="margin: 4px 0 0; padding-left: 18px;">
+              <li>Upload your project archive (.zip) to your Google Drive.</li>
+              <li>Set sharing permissions to <em>"Anyone with the link can view"</em>.</li>
+              <li>Paste the Drive shareable link into the <strong>Tasks</strong> module in your Intern Portal.</li>
+            </ol>
+          </div>
+
+          ${renderInternLoginButtonHtml('Login to Submit Task Link →')}
+          <p style="font-size: 12px; color: #6b7280; margin: 12px 0 0; text-align: center;">Log in to your Intern Portal to inspect and submit your task.</p>
         </div>
-        <div style="padding: 16px; text-align: center; background-color: #f9fafb; border: 1px solid #e5e7eb; border-top: none;">
+        <div style="padding: 14px; text-align: center; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
           <p style="font-size: 11px; color: #9ca3af; margin: 0;">&copy; ${new Date().getFullYear()} Intern Desk. All rights reserved.</p>
         </div>
       </div>
@@ -276,33 +286,63 @@ exports.sendTaskAssignedEmail = async (to, { internName, taskName, technology, d
   await transporter.sendMail(mailOptions)
 }
 
-exports.sendTaskReviewedEmail = async (to, { internName, taskName, marks, feedback, technology }) => {
-  const subject = `Practical Task Review Published – ${taskName}`
+exports.sendTaskReviewedEmail = async (to, { internName, taskName, marks, feedback, technology, status, driveLink }) => {
+  const isApproved = status === 'Approved'
+  const subject = isApproved
+    ? `Practical Task Approved (${marks !== undefined && marks !== null ? `${marks}/10` : 'Approved'}) – ${taskName}`
+    : `Practical Task Feedback & Re-upload Required – ${taskName}`
+  const accentColor = isApproved ? '#16a34a' : '#dc2626'
+  const statusLabel = isApproved ? 'Approved' : 'Revision / Re-upload Required'
   const loginUrl = getInternLoginUrl()
 
   const mailOptions = {
     from: `"Intern Desk Admin" <${process.env.EMAIL_USER}>`,
     to,
     subject,
-    text: `Dear ${internName},\n\nYour task "${taskName}" for ${technology} has been evaluated.\nMarks: ${marks || '—'}\nFeedback: ${feedback || '—'}\n\nLogin to Intern Portal: ${loginUrl}\n\nPlease check your Intern Portal for details.`,
+    text: `Dear ${internName},\n\nYour practical task "${taskName}" (${technology}) has been evaluated by the administrator.\n\nEvaluation Result: ${statusLabel}\n${marks !== undefined && marks !== null ? `Marks Awarded: ${marks}/10\n` : ''}${feedback ? `Admin Written Feedback: ${feedback}\n` : ''}\n${!isApproved ? 'ACTION REQUIRED: Please address the admin feedback, update your project code on Google Drive, and submit the revised shareable link in the Tasks module on your Intern Portal.\n\n' : ''}Login to Intern Portal: ${loginUrl}\n\n- Intern Desk Team`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto;">
-        <div style="background-color: #0f1a2e; padding: 20px; text-align: center;">
+      <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+        <div style="background-color: #0f1a2e; padding: 22px; text-align: center;">
           <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Intern Desk</h1>
-          <p style="color: #8899aa; margin: 4px 0 0; font-size: 12px;">Task Evaluation</p>
+          <p style="color: #8899aa; margin: 4px 0 0; font-size: 12px;">Practical Task Evaluation & Feedback</p>
         </div>
-        <div style="padding: 24px; background-color: #ffffff; border: 1px solid #e5e7eb;">
+        <div style="padding: 24px; background-color: #ffffff;">
           <h2 style="margin: 0 0 12px; font-size: 16px; color: #1f2937;">${subject}</h2>
-          <p style="font-size: 14px; color: #4b5563; margin: 0 0 10px;">Dear ${internName},</p>
-          <p style="font-size: 14px; color: #4b5563; margin: 0 0 14px;">Your submission for <strong>${taskName}</strong> has been evaluated by the admin.</p>
-          <div style="padding: 16px; background-color: #f3f4f6; border-radius: 8px; margin-bottom: 14px;">
-            ${marks !== undefined && marks !== null ? `<p style="margin: 0; font-size: 16px; font-weight: 700; color: #0f1a2e;">Marks: ${marks}</p>` : ''}
-            ${feedback ? `<p style="margin: 6px 0 0; font-size: 14px; color: #4b5563;">Feedback: ${feedback}</p>` : ''}
+          <p style="font-size: 14px; color: #4b5563; margin: 0 0 14px;">Dear <strong>${internName}</strong>,</p>
+          <p style="font-size: 14px; color: #4b5563; margin: 0 0 14px;">Your submission for <strong>${taskName}</strong> (<strong>${technology}</strong>) has been evaluated by the administrator.</p>
+
+          <div style="padding: 16px; background-color: #f9fafb; border-radius: 8px; border-left: 4px solid ${accentColor}; margin-bottom: 16px;">
+            <p style="margin: 0; font-size: 15px; font-weight: 700; color: ${accentColor};">
+              Status: ${statusLabel}
+            </p>
+            ${marks !== undefined && marks !== null ? `
+              <p style="margin: 8px 0 0; font-size: 14px; color: #1f2937;">
+                Score / Marks: <strong style="color: #ea580c; font-size: 16px;">${marks}/10</strong>
+              </p>
+            ` : ''}
+            ${feedback ? `
+              <div style="margin-top: 10px; padding: 10px 12px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 6px;">
+                <p style="margin: 0; font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase;">Admin Written Feedback:</p>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #374151; line-height: 1.5; font-style: italic;">
+                  "${feedback}"
+                </p>
+              </div>
+            ` : ''}
           </div>
-          ${renderInternLoginButtonHtml('Login to View Feedback →')}
-          <p style="font-size: 13px; color: #4b5563; margin: 10px 0 0; text-align: center;">Log in to your Intern Portal to check the full details.</p>
+
+          ${!isApproved ? `
+            <div style="padding: 12px 14px; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin-bottom: 16px;">
+              <p style="margin: 0; font-size: 13px; font-weight: 700; color: #b91c1c;">⚠️ Action Required: Re-upload Practical Task</p>
+              <p style="margin: 4px 0 0; font-size: 12px; color: #7f1d1d; line-height: 1.5;">
+                Please fix the issues specified in the admin remarks, update your Google Drive archive, and submit your revised Google Drive link in the 'Tasks' module of your Intern Portal.
+              </p>
+            </div>
+          ` : ''}
+
+          ${renderInternLoginButtonHtml('Login to Intern Portal →')}
+          <p style="font-size: 12px; color: #6b7280; margin: 12px 0 0; text-align: center;">Log in to your Intern Portal to inspect the full review and task details.</p>
         </div>
-        <div style="padding: 16px; text-align: center; background-color: #f9fafb; border: 1px solid #e5e7eb; border-top: none;">
+        <div style="padding: 14px; text-align: center; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
           <p style="font-size: 11px; color: #9ca3af; margin: 0;">&copy; ${new Date().getFullYear()} Intern Desk. All rights reserved.</p>
         </div>
       </div>
@@ -525,32 +565,45 @@ exports.sendAdminTestSubmissionEmail = async ({ internName, internEmail, technol
   }
 }
 
-exports.sendAdminTaskSubmissionEmail = async ({ internName, internEmail, technology, taskName, submittedAt }) => {
+exports.sendAdminTaskSubmissionEmail = async ({ internName, internEmail, technology, taskName, driveLink, isReupload, submittedAt }) => {
   const adminEmail = await getAdminRecipientEmail()
   if (!adminEmail) return
   const dateStr = submittedAt ? new Date(submittedAt).toLocaleString('en-GB') : new Date().toLocaleString('en-GB')
-  const subject = `[New Submission] Practical Task – ${internName} (${taskName})`
+  const subject = isReupload
+    ? `[Re-uploaded] Practical Task – ${internName} (${taskName})`
+    : `[New Submission] Practical Task – ${internName} (${taskName})`
 
   const mailOptions = {
     from: `"Intern Desk Alerts" <${process.env.EMAIL_USER}>`,
     to: adminEmail,
     subject,
-    text: `Admin Alert:\n\nIntern ${internName} (${internEmail}) has submitted their completed project archive (.zip) for practical task "${taskName}" (${technology}).\nSubmitted at: ${dateStr}\n\nPlease log in to the Admin Portal (Task Management) to download the ZIP, grade, and review.`,
+    text: `Admin Alert:\n\nIntern ${internName} (${internEmail}) has ${isReupload ? 're-uploaded a revised' : 'submitted their'} Google Drive project link for practical task "${taskName}" (${technology}).\n\nSubmitted at: ${dateStr}\nGoogle Drive Link: ${driveLink || '—'}\n\nPlease log in to the Admin Portal (Task Management) to open the Drive link, grade, and send feedback.`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
         <div style="background-color: #0f1a2e; padding: 20px; text-align: center;">
           <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Intern Desk · Admin Alert</h1>
-          <p style="color: #0284c7; margin: 4px 0 0; font-size: 13px; font-weight: bold;">📁 Practical Task ZIP Uploaded</p>
+          <p style="color: #f97316; margin: 4px 0 0; font-size: 13px; font-weight: bold;">📁 ${isReupload ? 'Practical Task Link Re-uploaded' : 'Practical Task Link Submitted'}</p>
         </div>
         <div style="padding: 24px; background-color: #ffffff;">
-          <h2 style="margin: 0 0 14px; font-size: 16px; color: #111827;">New Practical Task Submitted</h2>
-          <div style="padding: 16px; background-color: #f8fafc; border-radius: 8px; border-left: 4px solid #0284c7; margin-bottom: 16px; font-size: 14px; color: #334155; line-height: 1.6;">
+          <h2 style="margin: 0 0 14px; font-size: 16px; color: #111827;">${isReupload ? 'Revised Practical Task Submitted' : 'New Practical Task Submitted'}</h2>
+          <div style="padding: 16px; background-color: #f8fafc; border-radius: 8px; border-left: 4px solid #f97316; margin-bottom: 16px; font-size: 14px; color: #334155; line-height: 1.6;">
             <p style="margin: 0;"><strong>Intern:</strong> ${internName} (${internEmail})</p>
             <p style="margin: 4px 0 0;"><strong>Task Name:</strong> ${taskName}</p>
             <p style="margin: 4px 0 0;"><strong>Technology:</strong> ${technology}</p>
-            <p style="margin: 4px 0 0;"><strong>Submitted:</strong> ${dateStr}</p>
+            <p style="margin: 4px 0 0;"><strong>Submission Type:</strong> ${isReupload ? '<span style="color: #ea580c; font-weight: bold;">Revised Re-upload</span>' : 'Initial Submission'}</p>
+            <p style="margin: 4px 0 0;"><strong>Submitted At:</strong> ${dateStr}</p>
+            ${driveLink ? `
+              <div style="margin-top: 10px; padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px;">
+                <span style="font-size: 12px; font-weight: bold; color: #64748b; text-transform: uppercase;">Google Drive Link:</span>
+                <p style="margin: 4px 0 0; font-size: 13px; word-break: break-all;">
+                  <a href="${driveLink}" target="_blank" style="color: #0284c7; font-weight: bold; text-decoration: underline;">
+                    ${driveLink}
+                  </a>
+                </p>
+              </div>
+            ` : ''}
           </div>
-          <p style="font-size: 13px; color: #64748b; margin: 0;">Log in to the Admin Portal under <strong>Task Management</strong> to download the submitted project ZIP and provide grading/feedback.</p>
+          <p style="font-size: 13px; color: #64748b; margin: 0;">Log in to the Admin Portal under <strong>Task Management &gt; View Submissions</strong> to access the project files and provide marks/feedback.</p>
         </div>
         <div style="padding: 14px; text-align: center; background-color: #f1f5f9; border-top: 1px solid #e2e8f0;">
           <p style="font-size: 11px; color: #94a3b8; margin: 0;">Intern Desk Admin Notification System</p>
